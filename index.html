@@ -158,28 +158,24 @@
   const output = document.getElementById('output');
   let extractor = null;
 
-  // --- MASSIVELY SCALED CLINICAL DATABASE (Includes Allergies, Stomach & GI, Wellness, Chronic) ---
+  // --- MASSIVELY SCALED COMPREHENSIVE CLINICAL DATABASE ---
   const clinicalDatabase = [
-    // --- Mild & Seasonal Allergies (Level 5 Routine Care) ---
+    // --- 1. ALLERGIES & IMMUNOLOGY ---
     {
-      keywords: [
-        'allergy', 'allergies', 'allergic', 'hay fever', 'allergic rhinitis', 'pollen allergy', 
-        'dust allergy', 'pet dander', 'food allergy', 'skin allergy', 'contact dermatitis', 
-        'itchy eyes', 'watery eyes', 'allergic hives', 'mild allergic rash'
-      ],
+      keywords: ['allergy', 'allergies', 'allergic', 'hay fever', 'allergic rhinitis', 'pollen allergy', 'dust allergy', 'pet dander', 'food allergy', 'skin allergy', 'contact dermatitis', 'itchy eyes', 'watery eyes', 'allergic hives', 'mild allergic rash'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
-      action: "Manage with allergen avoidance, oral antihistamines, and nasal sprays. Monitor for any breathing or throat swelling.",
-      department: "Primary Care / Allergy & Immunology Outpatient",
+      action: "Manage with allergen avoidance, oral antihistamines, and nasal sprays.",
+      department: "Primary Care / Allergy Outpatient Clinic",
       medSupport: "Allergy Management: Non-drowsy second-generation antihistamines (Cetirizine, Loratadine, Fexofenadine), intranasal corticosteroids (Fluticasone), saline nasal rinses, and topical hydrocortisone for mild skin itching."
     },
 
-    // --- Stomach & Gastrointestinal Specific Conditions ---
+    // --- 2. GASTROINTESTINAL & STOMACH CONDITIONS ---
     {
       keywords: ['stomach pain', 'stomach ache', 'abdominal pain', 'belly ache', 'stomach cramp', 'gastric pain'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
-      action: "Manage with dietary modifications, hydration, and antacids. Consult primary care if pain persists.",
+      action: "Manage with dietary modifications, hydration, and antacids.",
       department: "Primary Care Outpatient Clinic",
       medSupport: "Gastrointestinal Care: Antacids (Calcium Carbonate/Magnesium Hydroxide), warm compresses, bland diet (BRAT diet), and hydration."
     },
@@ -264,30 +260,6 @@
       medSupport: "Anti-nausea Care: Ginger root extract, dimenhydrinate or meclizine (motion/nausea relief), and clear liquid hydration."
     },
     {
-      keywords: ['vomiting', 'throwing up', 'puking', 'emesis'],
-      acuity: "Level 3 - Urgent / Priority (if persistent) or Routine",
-      color: "#38bdf8",
-      action: "Prevent dehydration with small sips of ORS. Seek urgent care if persistent for over 24 hours or containing blood.",
-      department: "Primary Care / Urgent Care",
-      medSupport: "Rehydration & Anti-emetics: Oral rehydration therapy, anti-nausea injectables/tablets (Ondansetron) per physician evaluation."
-    },
-    {
-      keywords: ['gallbladder pain', 'biliary colic', 'gallstones', 'right upper quadrant pain'],
-      acuity: "Level 3 - Urgent / Priority",
-      color: "#f59e0b",
-      action: "Prompt medical evaluation required with ultrasound imaging and dietary fat restriction.",
-      department: "Urgent Care / Gastroenterology",
-      medSupport: "Biliary Management: Low-fat diet, antispasmodics, and surgical consultation (cholecystectomy evaluation) if gallstones are symptomatic."
-    },
-    {
-      keywords: ['pancreatitis', 'pancreas inflammation', 'severe upper abdominal pain'],
-      acuity: "Level 3 - Urgent / Priority",
-      color: "#f59e0b",
-      action: "Urgent clinical evaluation required. Hospital admission often necessary for intravenous fluids and bowel rest.",
-      department: "Emergency Department / Urgent Care",
-      medSupport: "Hospital Support: IV fluid resuscitation, pain management, and strict nil-per-os (NPO) bowel rest under medical supervision."
-    },
-    {
       keywords: ['celiac disease', 'gluten intolerance', 'gluten sensitivity'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
@@ -296,84 +268,126 @@
       medSupport: "Dietary Care: Strict gluten-free diet adherence, vitamin/mineral supplementation (iron, calcium, vitamin D), and mucosal healing follow-up."
     },
 
-    // --- Wellness, Hair & Skin Concerns ---
+    // --- 3. WELLNESS, HAIR & DERMATOLOGY ---
     {
-      keywords: ['hairfall', 'hair loss', 'alopecia', 'thinning hair', 'baldness', 'shedding hair'],
+      keywords: ['hairfall', 'hair loss', 'alopecia', 'thinning hair', 'baldness', 'shedding hair', 'hair damage', 'receding hairline'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
       action: "Manage with nutritional tracking, gentle hair care routines, and dermatologist evaluation if persistent.",
       department: "Dermatology / Routine Outpatient Care",
-      medSupport: "Dermatological & Nutritional Care: Biotin, iron/ferritin level screening, scalp care, minoxidil topical solutions, and balanced protein intake."
+      medSupport: "Dermatological & Nutritional Care: Biotin, iron/ferritin level screening, scalp care, minoxidil topical solutions (under medical advice), and balanced protein intake."
     },
     {
-      keywords: ['dry skin', 'skin dryness', 'dryness', 'flaky skin', 'chapped skin'],
+      keywords: ['dry skin', 'skin dryness', 'dryness', 'flaky skin', 'chapped skin', 'rough skin', 'scaling skin', 'peeling skin'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
       action: "Manage at home with barrier repair moisturizers, adequate hydration, and mild cleansers.",
       department: "Primary Care / Dermatology Care",
-      medSupport: "Dermatological Care: Daily application of ceramide-rich moisturizers, gentle fragrance-free cleansers, and increased water consumption."
+      medSupport: "Dermatological Care: Daily application of ceramide-rich moisturizers, gentle fragrance-free cleansers, petroleum jelly for extreme patches, and increased water consumption."
     },
     {
-      keywords: ['fatigue', 'tiredness', 'malaise', 'exhaustion', 'low energy', 'weakness'],
+      keywords: ['dandruff', 'flaky scalp', 'itchy scalp', 'scalp flaking', 'seborrheic dermatitis'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Manage at home with medicated shampoos and scalp care routines.",
+      department: "Dermatology / Home Care",
+      medSupport: "Scalp Care: Anti-dandruff shampoos containing ketoconazole, zinc pyrithione, or selenium sulfide, and gentle washing frequency."
+    },
+    {
+      keywords: ['fatigue', 'tiredness', 'malaise', 'exhaustion', 'low energy', 'weakness', 'lethargy', 'chronic fatigue'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
       action: "Evaluate sleep habits, balanced nutrition, and schedule routine blood panels.",
       department: "Primary Care Outpatient Clinic",
-      medSupport: "Systemic Screening: Complete blood count (CBC), iron panel, thyroid stimulating hormone (TSH), and sleep hygiene optimization."
+      medSupport: "Systemic Screening: Complete blood count (CBC), iron panel, thyroid stimulating hormone (TSH), vitamin D/B12 checks, sleep hygiene optimization, and balanced nutrition."
     },
 
-    // --- Chronic Metabolic & Endocrine Diseases ---
+    // --- 4. METABOLIC & ENDOCRINE ---
     {
-      keywords: ['diabetes', 'diabeties', 'diabetic', 'blood sugar', 'hyperglycemia', 'hypoglycemia', 'insulin'],
+      keywords: ['diabetes', 'diabeties', 'diabetic', 'blood sugar', 'hyperglycemia', 'hypoglycemia', 'insulin', 'type 1 diabetes', 'type 2 diabetes', 'insulin resistance'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
       action: "Manage at home with rest, lifestyle modifications, and scheduled outpatient monitoring.",
       department: "Primary Care Clinic / Specialized Outpatient Care",
-      medSupport: "Chronic Metabolic Care: Regular blood glucose monitoring, HbA1c tracking, carbohydrate-controlled diet, and prescribed oral hypoglycemics (Metformin) or Insulin."
+      medSupport: "Chronic Metabolic Care: Regular blood glucose monitoring, HbA1c tracking, carbohydrate-controlled diet, hydration, and adherence to prescribed oral hypoglycemics (e.g., Metformin) or Insulin under endocrinologist supervision."
     },
     {
-      keywords: ['hypothyroid', 'hyperthyroid', 'thyroid', 'hashimoto', 'graves disease'],
+      keywords: ['hypothyroid', 'hyperthyroid', 'thyroid', 'hashimoto', 'graves disease', 'cushing', 'addison', 'goiter'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
       action: "Manage at home with rest, lifestyle modifications, and scheduled outpatient monitoring.",
       department: "Primary Care Clinic / Specialized Outpatient Care",
-      medSupport: "Endocrine Management: Scheduled hormone replacement therapy (Levothyroxine) monitored via serum TSH and free T4 blood panels."
-    },
-
-    // --- Musculoskeletal Conditions ---
-    {
-      keywords: ['arthritis', 'arthiritis', 'osteoarthritis', 'rheumatoid', 'joint pain', 'gout', 'fibromyalgia'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Manage at home with rest, lifestyle modifications, and scheduled outpatient monitoring.",
-      department: "Primary Care Clinic / Specialized Outpatient Care",
-      medSupport: "Musculoskeletal Care: Physical therapy, low-impact joint conditioning, weight management, and anti-inflammatory support (Topical Diclofenac or Ibuprofen)."
+      medSupport: "Endocrine Management: Scheduled hormone replacement therapy (e.g., Levothyroxine) or anti-thyroid agents, monitored periodically via serum TSH and free T4 blood panels."
     },
 
-    // --- Pulmonary & Cardiovascular ---
+    // --- 5. MUSCULOSKELETAL & RHEUMATOLOGY ---
     {
-      keywords: ['asthma', 'asthama', 'astma', 'wheezing', 'copd', 'bronchitis'],
+      keywords: ['arthritis', 'arthiritis', 'osteoarthritis', 'rheumatoid', 'joint pain', 'gout', 'fibromyalgia', 'osteoporosis', 'joint stiffness', 'joint swelling'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
       action: "Manage at home with rest, lifestyle modifications, and scheduled outpatient monitoring.",
       department: "Primary Care Clinic / Specialized Outpatient Care",
-      medSupport: "Pulmonary Care: Trigger avoidance, maintenance inhalers, and accessible rescue inhalers."
+      medSupport: "Musculoskeletal Care: Physical therapy, low-impact joint conditioning, weight management, calcium/vitamin D supplementation, and anti-inflammatory support (Topical Diclofenac or Ibuprofen) per rheumatology guidance."
     },
     {
-      keywords: ['hypertension', 'high blood pressure', 'bp', 'atherosclerosis'],
+      keywords: ['muscle strain', 'sprain', 'back pain', 'neck pain', 'shoulder pain', 'knee pain', 'heel pain', 'plantar fasciitis', 'sciatica', 'muscle soreness'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Manage with RICE protocol, physical therapy stretching, and ergonomic adjustments.",
+      department: "Primary Care / Physical Therapy",
+      medSupport: "Orthopedic Routine Care: Rest, ice, compression, elevation (RICE), physical therapy stretching routines, ergonomic posture adjustments, and topical analgesic gels."
+    },
+
+    // --- 6. PULMONARY & RESPIRATORY ---
+    {
+      keywords: ['asthma', 'asthama', 'astma', 'wheezing', 'copd', 'bronchitis', 'emphysema', 'bronchiectasis', 'cystic fibrosis', 'chronic cough'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
       action: "Manage at home with rest, lifestyle modifications, and scheduled outpatient monitoring.",
       department: "Primary Care Clinic / Specialized Outpatient Care",
-      medSupport: "Cardiovascular Care: Daily blood pressure logging, DASH diet (low sodium), stress reduction, and antihypertensives."
+      medSupport: "Pulmonary Care: Trigger avoidance (smoke, allergens, pollutants), pulmonary rehabilitation exercises, maintenance inhalers, and accessible rescue inhalers."
     },
     {
-      keywords: ['headache', 'migraine', 'migrane', 'vertigo', 'dizziness'],
+      keywords: ['cold', 'cough', 'runny nose', 'throat', 'sore', 'flu', 'sinusitis', 'sinus', 'rhinitis', 'tonsillitis', 'laryngitis', 'common cold', 'sneezing', 'nasal congestion'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Manage at home with rest and hydration. Consult primary care if symptoms persist over 5-7 days.",
+      department: "Primary Care Clinic / Home Care",
+      medSupport: "Upper Respiratory Care: Dextromethorphan (cough suppressant), warm saline gargles, decongestants, lozenges, and Paracetamol for mild body aches."
+    },
+
+    // --- 7. CARDIOVASCULAR & NEUROLOGICAL ---
+    {
+      keywords: ['hypertension', 'high blood pressure', 'bp', 'atherosclerosis', 'arrhythmia', 'angina', 'heart failure', 'elevated bp'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
       action: "Manage at home with rest, lifestyle modifications, and scheduled outpatient monitoring.",
       department: "Primary Care Clinic / Specialized Outpatient Care",
-      medSupport: "Neurological Routine Care: Paracetamol or Ibuprofen, rest in a quiet dark environment, and hydration."
+      medSupport: "Cardiovascular Care: Daily blood pressure logging, DASH diet (low sodium), stress reduction, and consistent adherence to antihypertensives."
+    },
+    {
+      keywords: ['headache', 'migraine', 'migrane', 'tension headache', 'cluster headache'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Manage at home with rest, lifestyle modifications, and scheduled outpatient monitoring.",
+      department: "Primary Care Clinic / Specialized Outpatient Care",
+      medSupport: "Neurological Routine Care: Paracetamol or Ibuprofen, rest in a quiet, dark environment, hydration, and trigger identification."
+    },
+    {
+      keywords: ['eczema', 'psoriasis', 'dermatitis', 'rash', 'acne', 'rosacea', 'hives', 'urticaria', 'vitiligo'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Manage at home with rest, lifestyle modifications, and scheduled outpatient monitoring.",
+      department: "Primary Care Clinic / Specialized Outpatient Care",
+      medSupport: "Dermatological Care: Topical emollients, barrier repair creams, prescribed topical corticosteroids or calcineurin inhibitors, and gentle fragrance-free cleansers."
+    },
+    {
+      keywords: ['anxiety', 'depression', 'insomnia', 'stress', 'panic disorder', 'adhd', 'bipolar', 'ptsd', 'ocd', 'sleep disorder'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Manage at home with rest, lifestyle modifications, and scheduled outpatient monitoring.",
+      department: "Primary Care Clinic / Specialized Outpatient Care",
+      medSupport: "Mental Wellness & Sleep Support: Cognitive behavioral strategies, sleep hygiene optimization (consistent schedule, dark room), mindfulness, and professional psychological evaluation."
     }
   ];
 
@@ -388,21 +402,17 @@
     try {
       if (!extractor) {
         output.textContent = "Initializing Neural Core (Bio_ClinicalBERT Local Weights)...";
-        
-        extractor = await pipeline('feature-extraction', './model', {
-          local_files_only: true
-        });
+        extractor = await pipeline('feature-extraction', './model', { local_files_only: true });
       }
 
       output.textContent = "Executing Deep Semantic Embedding & Triage Matrix...";
       const embeddings = await extractor(text, { pooling: 'mean', normalize: true });
       const vectorData = embeddings.tolist()[0];
-
       const lower = text.toLowerCase();
       
       let acuity, color, action, department, medSupport;
 
-      // 1. LEVEL 1: CRITICAL EMERGENCIES (Life-Threatening Red Flags, Anaphylaxis, Trauma & Envenomation)
+      // --- CRITICAL EMERGENCIES (LEVEL 1) ---
       const criticalKeywords = [
         'chest pain', 'heart attack', 'myocardial infarction', 'unconscious', 'unresponsive', 
         'stroke', 'cerebrovascular accident', 'cva', 'severe bleeding', 'hemorrhage', 'anaphylaxis', 
@@ -410,23 +420,29 @@
         'seizure', 'epileptic fit', 'poisoning', 'overdose', 'shortness of breath', 'difficulty breathing', 
         'cant breathe', "can't breathe", 'dyspnea', 'respiratory arrest', 'cardiac arrest', 'severe trauma', 
         'diabetic ketoacidosis', 'dka', 'hypertensive crisis', 'massive bleeding', 'blue lips', 'cyanosis', 
-        'sudden paralysis', 'facial drooping', 'slurred speech', 'severe head injury', 'internal bleeding', 
-        'choking', 'severe burns', 'electric shock', 'septic shock', 'acute appendicitis', 'bowel perforation',
-        // --- SNAKE BITES & ENVENOMATION ---
+        'sudden paralysis', 'paralysis', 'facial drooping', 'face drooping', 'slurred speech', 
+        'speech slurring', 'slurring', 'speech difficulty', 'trouble speaking', 'cant speak', "can't speak",
+        'numb', 'numbness', 'tingling', 'one side weak', 'arm weakness', 'loss of balance',
+        'sudden confusion', 'blurred vision', 'vision loss', 'double vision',
+        'faint', 'fainting', 'passed out', 'blackout', 'blacking out', 'syncope', 'collapsed',
+        'severe head injury', 'internal bleeding', 'choking', 'severe burns', 'electric shock', 
+        'septic shock', 'acute appendicitis', 'bowel perforation',
         'snake bite', 'snakebite', 'venom', 'venomous bite', 'poisonous bite', 
         'animal bite', 'severe sting', 'multiple bee stings', 'scorpion sting', 'spider bite'
       ];
 
-      // 2. LEVEL 3: URGENT / MODERATE CONDITIONS (Includes Acute Allergy Attacks & Angioedema)
+      // --- URGENT CONDITIONS (LEVEL 3) ---
       const urgentKeywords = [
-        'high fever', 'persistent vomiting', 'severe abdominal pain', 'fracture', 'broken bone', 
+        'dizzy', 'dizziness', 'vertigo', 'lightheaded', 'lightheadedness', 'room spinning', 
+        'spinning head', 'giddy', 'giddiness', 'unsteady', 'woozy',
+        'high fever', 'persistent vomiting', 'vomiting', 'severe abdominal pain', 'fracture', 'broken bone', 
         'deep wound', 'acute asthma attack', 'asthma attack', 'asthama attack', 'astma attack', 
         'allergy attack', 'allergy atttack', 'allergic attack', 'severe allergy', 'severe allergic reaction', 
         'acute allergic reaction', 'angioedema', 'facial swelling', 'swollen lips', 'lip swelling', 
         'severe hives', 'widespread hives', 'allergic flare up',
         'uncontrolled bleeding', 'severe migraine', 'severe migrane', 'kidney stone', 'renal colic', 
         'severe burn', 'pneumonia', 'pnuemonia', 'severe dehydration', 'acute chest infection', 
-        'high blood pressure spike', 'severe vertigo', 'concussion', 'tachycardia', 'severe back spasm', 
+        'high blood pressure spike', 'concussion', 'tachycardia', 'severe back spasm', 
         'blood in urine', 'bloody stool', 'cellulitis', 'dislocated joint', 'acute cholecystitis', 
         'severe ear infection', 'gallbladder pain', 'pancreatitis'
       ];
@@ -439,19 +455,18 @@
       if (isCriticalMatch) {
         acuity = "Level 1 - Resuscitation / Critical Emergency";
         color = "#ef4444";
-        action = "Immediate emergency intervention required. Activate trauma/cardiac/anaphylaxis protocol.";
+        action = "Immediate emergency intervention required. Activate stroke/trauma protocol.";
         department = "Emergency Department (ED)";
-        medSupport = "CRITICAL: Avoid oral self-medication. Prepare for emergency intramuscular Epinephrine, hemodynamic support, antivenom (if envenomated), and airway/oxygen therapy.";
+        medSupport = "CRITICAL: Avoid oral self-medication. Prepare for emergency airway, neuroimaging, and hemodynamic support.";
       } 
       else if (isUrgentMatch) {
         acuity = "Level 3 - Urgent / Priority";
         color = "#f59e0b";
-        action = "Prompt clinical evaluation recommended within 30-60 minutes.";
+        action = "Prompt clinical evaluation recommended within 30-60 minutes. Sit or lie down.";
         department = "Urgent Care / Ambulatory Clinic";
-        medSupport = "Targeted urgent care options: Fast-acting Antihistamines (Diphenhydramine/Cetirizine), corticosteroids, Paracetamol/Ibuprofen for pain/fever, rehydration solutions, or prescribed rescue inhalers / epinephrine auto-injector evaluation.";
+        medSupport = "Targeted urgent care options: Vitals check, electrolytes, vestibular suppressants, or fast-acting antihistamines.";
       }
       else {
-        // 3. SCAN THE SCALABLE DATABASE ARRAY
         let matchedRecord = clinicalDatabase.find(record => 
           record.keywords.some(kw => lower.includes(kw))
         );
@@ -463,16 +478,14 @@
           department = matchedRecord.department;
           medSupport = matchedRecord.medSupport;
         } else {
-          // Default Fallback Routine Care
           acuity = "Level 5 - Non-Urgent / Routine";
           color = "#38bdf8";
-          action = "Manage at home with rest, lifestyle modifications, and scheduled outpatient monitoring.";
+          action = "Manage at home with rest, lifestyle modifications, and outpatient monitoring.";
           department = "Primary Care Clinic / Specialized Outpatient Care";
-          medSupport = "General Routine Care: Balanced nutrition, adequate hydration, rest, and standard OTC options (Paracetamol, Ibuprofen, multivitamins) subject to licensed pharmacist review.";
+          medSupport = "General Routine Care: Nutrition, hydration, and standard OTC options.";
         }
       }
 
-      // Render Futuristic Clinical & Pharmacological Report
       output.innerHTML = `🧬 <b>FUTURE-GEN AI HEALTHCARE INTELLIGENCE REPORT</b><br><br>` +
                          `──────────────────────────────────────────<br>` +
                          `• <b>Evaluated Clinical Input:</b> "${text}"<br>` +
@@ -484,7 +497,7 @@
                          `• <b>Neural Engine:</b> Bio_ClinicalBERT Edge Quantized<br>` +
                          `• <b>Vector Matrix Space:</b> ${vectorData.length}-D tensor matrix processed<br>` +
                          `• <b>Data Privacy Status:</b> 100% On-Device (Zero Cloud Transmission)<br><br>` +
-                         `<i>Disclaimer: AI prototype for science exhibition demonstration. All medication and chemical composition references are for informational comparison and require licensed physician/pharmacist verification.</i>`;
+                         `<i>Disclaimer: AI prototype for science exhibition demonstration. Requires physician verification.</i>`;
 
     } catch (err) {
       output.textContent = "Error Details: " + err.message;
