@@ -199,15 +199,43 @@
     return dot;
   }
 
+  // Split long conversational sentences into clean symptom/finding clauses
   function splitIntoClauses(rawText) {
     const parts = rawText
-      .split(/[,;.!?\n]+|\b(?:and|or|but|also|plus|along with|with|since|because|like this|this that)\b/gi)
+      .split(/[,;.!?\n]+|\b(?:and|or|but|also|plus|along with|with|since|because|like this|this that|i have|i got|my)\b/gi)
       .map(s => s.trim())
       .filter(s => s.length > 1);
     return parts.length ? parts : [rawText.trim()];
   }
 
   const clinicalDatabase = [
+    // 0. GENETICS, GENOMIC MUTATIONS, CHROMOSOMAL & PRECISION ONCOLOGY
+    {
+      keywords: [
+        'dna mutation', 'gene mutation', 'genetic mutation', 'somatic mutation', 'germline mutation',
+        'point mutation', 'missense mutation', 'nonsense mutation', 'frameshift mutation',
+        'splice site mutation', 'insertion', 'deletion', 'duplication', 'translocation', 'inversion',
+        'chromosomal abnormality', 'chromosome abnormality', 'chromosomal disorder', 'aneuploidy',
+        'karyotype abnormality', 'copy number variation', 'cnv', 'variant of uncertain significance', 'vus',
+        'pathogenic variant', 'likely pathogenic', 'genetic disorder', 'inherited disorder', 'hereditary condition',
+        'carrier status', 'genetic carrier', 'genetic testing', 'genomic profiling', 'next generation sequencing', 'ngs',
+        'brca', 'brca1', 'brca2', 'tp53', 'p53', 'kras', 'nras', 'hras', 'egfr', 'alk', 'ros1',
+        'braf', 'her2', 'erbb2', 'pik3ca', 'pten', 'myc', 'bcr-abl', 'philadelphia chromosome',
+        'jak2', 'flt3', 'npm1', 'idh1', 'idh2', 'ret', 'met', 'ntrk', 'fgfr', 'lynch syndrome',
+        'familial adenomatous polyposis', 'fap', 'tay sachs', 'huntington', 'cystic fibrosis', 'cftr',
+        'phenylketonuria', 'pku', 'maple syrup urine disease', 'wilson disease', 'hemochromatosis',
+        'alpha-1 antitrypsin', 'g6pd deficiency', 'fragile x', 'turner syndrome', 'klinefelter syndrome',
+        'edwards syndrome', 'patau syndrome', 'cri du chat', 'prader willi', 'angelman syndrome',
+        'oncogene', 'tumor suppressor gene', 'dna repair', 'homologous recombination deficiency', 'hrd', 'microsatellite instability', 'msi'
+      ],
+      acuity: "Level 3 - Urgent / Priority Genetics & Precision Medicine",
+      color: "#f59e0b",
+      action: "Schedule Clinical Genetics consultation and certified genetic counseling to review zygosity (germline vs. somatic), clinical penetrance, family cascade screening, and organ/cancer surveillance.",
+      department: "Clinical Genetics, Genomic Medicine & Precision Oncology",
+      medSupport: "Genomic & Targeted Care Pathway: Certified genetic counseling, confirmatory clinical-grade sequencing/karyotype/FISH/array testing, family cascade testing, organ-specific surveillance protocols, and biomarker-guided targeted therapies (e.g., PARP inhibitors, TKIs, monoclonal antibodies, or gene/enzyme therapies as indicated by the exact variant)."
+    },
+
+    // 1. ONCOLOGY - ALL MAJOR CANCER CATEGORIES
     {
       keywords: [
         'carcinoma', 'adenocarcinoma', 'squamous cell carcinoma', 'basal cell carcinoma',
@@ -316,6 +344,8 @@
       department: "Comprehensive Oncology Clinic",
       medSupport: "Oncology Care: Site-specific diagnostic endoscopy/imaging, molecular biomarker profiling, surgical oncology, radiation therapy, immunotherapy, and palliative symptom support."
     },
+
+    // 2. DISABILITIES & FUNCTIONAL IMPAIRMENTS
     {
       keywords: [
         'hearing problem', 'hearing impairment', 'hearing disability', 'hard of hearing',
@@ -422,6 +452,8 @@
       department: "Psychiatry & Psychosocial Rehabilitation",
       medSupport: "Psychosocial Care: Maintenance antipsychotic/mood-stabilizing therapy under psychiatrist supervision, psychotherapy, and community support programs."
     },
+
+    // 3. NUTRITIONAL & MICRONUTRIENT DEFICIENCIES
     {
       keywords: ['vitamin d deficiency', 'low vitamin d', 'rickets', 'osteomalacia', 'bone softening', 'hypovitaminosis d'],
       acuity: "Level 5 - Non-Urgent / Routine",
@@ -502,6 +534,8 @@
       department: "Internal Medicine & Clinical Nutrition",
       medSupport: "Nutritional Rehabilitation: Supervised gradual caloric and high-biological-value protein repletion, multivitamin/mineral support, and refeeding electrolyte monitoring."
     },
+
+    // 4. INFECTIOUS, ORGAN, METABOLIC, PULMONARY, CARDIO, NEURO & ROUTINE
     {
       keywords: ['fever', 'pyrexia', 'chills', 'shivering', 'malaria', 'plasmodium', 'dengue', 'typhoid', 'enteric fever', 'chikungunya', 'tuberculosis', 'tb', 'covid', 'covid-19', 'chickenpox', 'shingles'],
       acuity: "Level 3 - Urgent / Priority",
@@ -568,6 +602,7 @@
     }
   ];
 
+  // --- CRITICAL EMERGENCIES (LEVEL 1) ---
   const criticalKeywords = [
     'chest pain', 'heart attack', 'myocardial infarction', 'unconscious', 'unresponsive',
     'stroke', 'cerebrovascular accident', 'cva', 'severe bleeding', 'hemorrhage', 'anaphylaxis',
@@ -590,6 +625,7 @@
     'animal bite', 'dog bite', 'rabies exposure', 'severe sting', 'multiple bee stings', 'scorpion sting', 'spider bite'
   ];
 
+  // --- URGENT CONDITIONS (LEVEL 3) ---
   const urgentKeywords = [
     'dizzy', 'dizziness', 'vertigo', 'lightheaded', 'lightheadedness', 'room spinning',
     'spinning head', 'giddy', 'giddiness', 'unsteady', 'woozy',
@@ -607,7 +643,19 @@
     'pressure ulcer', 'bedsore'
   ];
 
+  // --- 768-D BIO_CLINICALBERT SEMANTIC PROTOTYPES FOR UNSTRUCTURED LONG SENTENCES ---
   const semanticPrototypes = [
+    {
+      label: "Genetics, Genomic Mutation & Hereditary Risk",
+      text: "dna mutation gene mutation genetic mutation chromosomal abnormality brca tp53 kras egfr hereditary carrier genomic counseling",
+      triage: {
+        acuity: "Level 3 - Urgent / Priority Genetics & Precision Medicine",
+        color: "#f59e0b",
+        action: "Schedule Clinical Genetics consultation and certified genetic counseling to review germline vs. somatic status, family cascade screening, and surveillance.",
+        department: "Clinical Genetics, Genomic Medicine & Precision Oncology",
+        medSupport: "Genomic & Targeted Care Pathway: Certified genetic counseling, confirmatory sequencing/karyotype testing, family screening, and biomarker-guided targeted therapy."
+      }
+    },
     {
       label: "Acute Fever & Systemic Infection",
       text: "patient has fever high temperature chills shivering body ache feeling hot sick unwell",
@@ -736,7 +784,7 @@
     if (matchedRecord) {
       return {
         ...matchedRecord,
-        matchSource: "Clinical / Oncology / Deficiency / Disability KB"
+        matchSource: "Clinical / Genomic / Oncology / Deficiency / Disability KB"
       };
     }
 
@@ -793,7 +841,6 @@
     return modelLoadingPromise;
   }
 
-  // Build prototypes in the background yielding between every single pass so clicks are never blocked
   function buildPrototypesInBackground(pipe) {
     if (prototypeVectors) return Promise.resolve(prototypeVectors);
     if (buildingProtosPromise) return buildingProtosPromise;
@@ -815,8 +862,8 @@
   }
 
   function matchPrototypeByTokenOverlap(userText) {
-    const words = userText.toLowerCase().match(/[a-z]{3,}/g) || [];
-    let best = semanticPrototypes[3];
+    const words = userText.toLowerCase().match(/[a-z0-9-]{2,}/g) || [];
+    let best = semanticPrototypes[4];
     let bestHits = -1;
     for (const proto of semanticPrototypes) {
       const protoWords = new Set(proto.text.toLowerCase().split(/\s+/));
@@ -833,7 +880,6 @@
     const userVec = await embedText(pipe, userText);
     if (btn.dataset.latestReq !== reqId) return null;
 
-    // If prototypes aren't built yet, return fast match immediately and build prototypes in background
     if (!prototypeVectors) {
       buildPrototypesInBackground(pipe);
       const { best, hits } = matchPrototypeByTokenOverlap(userText);
@@ -847,7 +893,7 @@
       };
     }
 
-    let bestProto = prototypeVectors[3];
+    let bestProto = prototypeVectors[4];
     let bestScore = -1;
     for (const proto of prototypeVectors) {
       const score = cosineSimilarity(userVec, proto.vector);
