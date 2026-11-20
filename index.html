@@ -147,7 +147,7 @@
   <div class="footer">Local-First &bull; Low-Bandwidth Ready</div>
 
 <script type="module">
-  // Load local vendored bundle first (0 bytes over network); fallback to CDN only if missing
+  // 1. Load local vendored bundle first (0 bytes over network); fallback to CDN only if missing
   async function loadTransformers() {
     try {
       return await import('./vendor/transformers.min.js');
@@ -158,6 +158,7 @@
 
   const { pipeline, env } = await loadTransformers();
 
+  // Enforce local model weights; block remote Hugging Face Hub calls
   env.allowLocalModels = true;
   env.allowRemoteModels = false;
   env.useBrowserCache = true;
@@ -168,8 +169,10 @@
 
   let extractor = null;
   let modelLoadingPromise = null;
+  let prototypeVectors = null;
   let lastVectorDim = 768;
-  let engineStatus = "Local Rule + Embedding Core Ready";
+  let lastSimilarity = null;
+  let engineStatus = "Local Bio_ClinicalBERT Ready";
 
   function escapeHtml(str) {
     return str
@@ -184,11 +187,28 @@
     return new RegExp(`(?<!\\w)${escaped}(?!\\w)`, 'i');
   }
 
-  // --- COMPREHENSIVE CLINICAL, ONCOLOGY, DEFICIENCY & DISABILITY DATABASE ---
+  function cosineSimilarity(vecA, vecB) {
+    let dot = 0;
+    const len = Math.min(vecA.length, vecB.length);
+    for (let i = 0; i < len; i++) {
+      dot += vecA[i] * vecB[i];
+    }
+    return dot; // valid when both vectors are mean-pooled & L2-normalized
+  }
+
+  // Split long conversational sentences into clean clauses so filler words ("this that") don't hide symptoms
+  function splitIntoClauses(rawText) {
+    const parts = rawText
+      .split(/[,;.!?\n]+|\b(?:and|or|but|also|plus|along with|with|since|because|like this|this that)\b/gi)
+      .map(s => s.trim())
+      .filter(s => s.length > 1);
+
+    return parts.length ? parts : [rawText.trim()];
+  }
+
+  // --- CLINICAL, ONCOLOGY, DEFICIENCY & DISABILITY DATABASE ---
   const clinicalDatabase = [
-    // ==========================================
     // 1. ONCOLOGY - ALL MAJOR CANCER CATEGORIES
-    // ==========================================
     {
       keywords: [
         'carcinoma', 'adenocarcinoma', 'squamous cell carcinoma', 'basal cell carcinoma',
@@ -298,9 +318,7 @@
       medSupport: "Oncology Care: Site-specific diagnostic endoscopy/imaging, molecular biomarker profiling, surgical oncology, radiation therapy, immunotherapy, and palliative symptom support."
     },
 
-    // ==========================================
-    // 2. DISABILITIES & FUNCTIONAL IMPAIRMENTS (50+ CONDITIONS)
-    // ==========================================
+    // 2. DISABILITIES & FUNCTIONAL IMPAIRMENTS
     {
       keywords: [
         'hearing problem', 'hearing impairment', 'hearing disability', 'hard of hearing',
@@ -408,9 +426,7 @@
       medSupport: "Psychosocial Care: Maintenance antipsychotic/mood-stabilizing therapy under psychiatrist supervision, psychotherapy, and community support programs."
     },
 
-    // ==========================================
     // 3. NUTRITIONAL & MICRONUTRIENT DEFICIENCIES
-    // ==========================================
     {
       keywords: ['vitamin d deficiency', 'low vitamin d', 'rickets', 'osteomalacia', 'bone softening', 'hypovitaminosis d'],
       acuity: "Level 5 - Non-Urgent / Routine",
@@ -492,399 +508,74 @@
       medSupport: "Nutritional Rehabilitation: Supervised gradual caloric and high-biological-value protein repletion, multivitamin/mineral support, and refeeding electrolyte monitoring."
     },
 
-    // ==========================================
-    // 4. INFECTIOUS & TROPICAL DISEASES
-    // ==========================================
+    // 4. INFECTIOUS, ORGAN, METABOLIC, PULMONARY, CARDIO, NEURO & ROUTINE
     {
-      keywords: ['malaria', 'plasmodium', 'chills and rigors', 'cyclical fever'],
+      keywords: ['fever', 'pyrexia', 'chills', 'shivering', 'malaria', 'plasmodium', 'dengue', 'typhoid', 'enteric fever', 'chikungunya', 'tuberculosis', 'tb', 'covid', 'covid-19', 'chickenpox', 'shingles'],
       acuity: "Level 3 - Urgent / Priority",
       color: "#f59e0b",
-      action: "Prompt blood smear / rapid diagnostic antigen test (RDT) and physician evaluation.",
-      department: "Infectious Disease / Urgent Care",
-      medSupport: "Antimalarial Care: Artemisinin-based combination therapy (ACT) or Chloroquine (species-dependent), antipyretics, and fluid monitoring."
-    },
-    {
-      keywords: ['dengue', 'dengue fever', 'breakbone fever', 'low platelets', 'thrombocytopenia'],
-      acuity: "Level 3 - Urgent / Priority",
-      color: "#f59e0b",
-      action: "Urgent NS1 antigen/IgM testing and serial platelet/hematocrit monitoring. Avoid NSAIDs/Aspirin.",
+      action: "Monitor temperature and hydration; seek prompt clinical evaluation or diagnostic testing if fever is high or persistent.",
       department: "Urgent Care / Internal Medicine",
-      medSupport: "Dengue Supportive Care: Strict oral/IV hydration, Paracetamol ONLY for fever (avoid Ibuprofen/Aspirin due to bleeding risk), and daily CBC monitoring."
+      medSupport: "Fever & Infectious Care: Oral rehydration, Paracetamol for fever/body aches (avoid NSAIDs/Aspirin if dengue is possible), and targeted diagnostic testing."
     },
     {
-      keywords: ['typhoid', 'enteric fever', 'salmonella typhi', 'step-ladder fever'],
-      acuity: "Level 3 - Urgent / Priority",
-      color: "#f59e0b",
-      action: "Clinical evaluation for blood culture/serology and targeted antibiotic course.",
-      department: "Internal Medicine / Infectious Disease",
-      medSupport: "Typhoid Care: Targeted antibiotics (Azithromycin or Ceftriaxone per sensitivity), hydration, soft digestible diet, and fever control."
-    },
-    {
-      keywords: ['chikungunya', 'viral polyarthralgia', 'mosquito fever'],
+      keywords: ['uti', 'urinary tract infection', 'burning urination', 'dysuria', 'painful urination', 'frequent urination', 'cystitis', 'ringworm', 'tinea', 'fungal infection', 'athlete foot', 'jock itch', 'candidiasis', 'yeast infection', 'conjunctivitis', 'pink eye'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
-      action: "Manage with rest, aggressive hydration, and physician-guided joint pain relief.",
-      department: "Primary Care / Internal Medicine",
-      medSupport: "Viral Joint Care: Paracetamol for fever/pain, adequate fluid intake, rest, and gentle joint mobilization after acute fever subsides."
+      action: "Schedule routine outpatient evaluation and targeted topical/oral care as appropriate.",
+      department: "Primary Care / Specialty Outpatient",
+      medSupport: "Targeted Outpatient Care: Urinalysis/culture for UTI, topical antifungals for skin/nail mycoses, or lubricating/antibiotic eye care for conjunctivitis."
     },
     {
-      keywords: ['tuberculosis', 'tb', 'pulmonary tb', 'night sweats', 'chronic cough with weight loss', 'hemoptysis'],
-      acuity: "Level 3 - Urgent / Priority",
-      color: "#f59e0b",
-      action: "Prompt respiratory isolation precaution, chest X-ray, and sputum AFB / GeneXpert testing.",
-      department: "Pulmonology / Infectious Disease",
-      medSupport: "Anti-Tubercular Therapy (ATT): Supervised multi-drug regimen (Rifampicin, Isoniazid, Pyrazinamide, Ethambutol), liver function monitoring, and nutritional support."
-    },
-    {
-      keywords: ['covid', 'covid-19', 'coronavirus', 'sars-cov-2', 'loss of taste', 'loss of smell', 'anosmia'],
+      keywords: ['jaundice', 'yellow eyes', 'yellow skin', 'hepatitis', 'fatty liver', 'nafld', 'mash', 'cirrhosis', 'chronic kidney disease', 'ckd', 'high creatinine', 'bph', 'prostate', 'pcos', 'pcod', 'endometriosis', 'fibroids'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
-      action: "Isolate, monitor oxygen saturation (SpO2) with pulse oximeter, rest, and hydrate.",
-      department: "Primary Care / Telehealth",
-      medSupport: "Viral Respiratory Care: Pulse oximetry monitoring (seek urgent care if SpO2 drops below 94%), Paracetamol, hydration, and antiviral evaluation if high-risk."
+      action: "Schedule targeted outpatient organ function panels, ultrasound, and specialist follow-up.",
+      department: "Internal Medicine / Specialty Outpatient",
+      medSupport: "Organ & Metabolic Care: Liver/kidney panels, lifestyle and dietary optimization, and specialist-guided maintenance therapy."
     },
     {
-      keywords: ['chickenpox', 'varicella', 'shingles', 'herpes zoster', 'blistering rash'],
+      keywords: ['anemia', 'anaemia', 'iron deficiency', 'low hemoglobin', 'pale skin', 'pallor', 'sickle cell', 'thalassemia', 'hemophilia', 'lupus', 'sle', 'sjogren', 'scleroderma', 'vasculitis', 'autoimmune disease'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
-      action: "Isolate until lesions crust over; consult physician early for antiviral therapy.",
+      action: "Schedule CBC, iron/ferritin or autoimmune panel, and specialist follow-up.",
+      department: "Hematology / Rheumatology Outpatient",
+      medSupport: "Hematologic & Autoimmune Care: Targeted iron/micronutrient therapy, disease-modifying/immunomodulatory guidance, and regular lab monitoring."
+    },
+    {
+      keywords: ['ear pain', 'earache', 'otitis', 'tinnitus', 'ringing in ears', 'nosebleed', 'epistaxis', 'cataract', 'glaucoma', 'dry eyes', 'toothache', 'dental pain', 'cavity', 'gingivitis', 'mouth ulcer'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Schedule routine ENT, ophthalmology, or dental outpatient evaluation.",
+      department: "ENT / Ophthalmology / Dental Clinic",
+      medSupport: "ENT, Eye & Dental Care: Warm saline rinses, lubricating drops, topical/oral analgesics, and specialist examination."
+    },
+    {
+      keywords: ['allergy', 'allergies', 'allergic', 'hay fever', 'allergic rhinitis', 'stomach pain', 'stomach ache', 'abdominal pain', 'bloating', 'gas', 'indigestion', 'acid reflux', 'gerd', 'heartburn', 'gastritis', 'ulcer', 'ibs', 'crohn', 'ulcerative colitis', 'constipation', 'hemorrhoids', 'piles', 'diarrhea', 'diarrhoea', 'loose stools', 'gastroenteritis', 'nausea', 'celiac disease', 'lactose intolerance'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Manage with hydration, oral rehydration salts (ORS), dietary adjustments, antihistamines, or antacids; consult care if symptoms persist.",
+      department: "Primary Care / Gastroenterology",
+      medSupport: "GI & Allergy Care: ORS/electrolytes, bland diet, antacids/PPIs, simethicone, or second-generation antihistamines."
+    },
+    {
+      keywords: ['hairfall', 'hair loss', 'alopecia', 'thinning hair', 'dry skin', 'flaky skin', 'dandruff', 'eczema', 'psoriasis', 'dermatitis', 'rash', 'acne', 'rosacea', 'hives', 'vitiligo', 'fatigue', 'tiredness', 'exhaustion', 'weakness', 'dehydration'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Manage with rest, hydration, skin/scalp barrier care, and routine lab screening if persistent.",
       department: "Primary Care / Dermatology",
-      medSupport: "Varicella-Zoster Care: Oral Acyclovir/Valacyclovir (most effective within 72 hours), calamine lotion, antihistamines for itching, and Paracetamol."
+      medSupport: "Dermatology & Wellness Care: Emollients, gentle cleansers, medicated shampoos, sleep/hydration habits, and CBC/iron/thyroid checks."
     },
     {
-      keywords: ['uti', 'urinary tract infection', 'burning urination', 'dysuria', 'painful urination', 'frequent urination', 'cystitis'],
+      keywords: ['diabetes', 'diabeties', 'diabetic', 'blood sugar', 'hyperglycemia', 'hypoglycemia', 'insulin', 'thyroid', 'hypothyroid', 'hyperthyroid', 'goiter', 'high cholesterol', 'hyperlipidemia', 'arthritis', 'arthiritis', 'joint pain', 'gout', 'fibromyalgia', 'osteoporosis', 'muscle strain', 'sprain', 'back pain', 'neck pain', 'knee pain', 'sciatica', 'asthma', 'asthama', 'astma', 'wheezing', 'copd', 'bronchitis', 'cold', 'cough', 'runny nose', 'sore throat', 'flu', 'influenza', 'sinusitis', 'sinus', 'hypertension', 'high blood pressure', 'bp', 'headache', 'migraine', 'migrane', 'neuropathy', 'anxiety', 'depression', 'insomnia', 'stress', 'adhd'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
-      action: "Schedule urinalysis and urine culture for targeted antibiotic therapy; increase water intake.",
-      department: "Primary Care / Urology",
-      medSupport: "Urologic Care: Targeted antibiotics (Nitrofurantoin or Fosfomycin per culture), urinary alkalinizers, phenazopyridine for discomfort, and high fluid intake."
-    },
-    {
-      keywords: ['ringworm', 'tinea', 'fungal infection', 'athlete foot', 'jock itch', 'candidiasis', 'yeast infection'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Keep affected skin clean and dry; treat with topical antifungal agents.",
-      department: "Primary Care / Dermatology",
-      medSupport: "Antifungal Care: Topical Clotrimazole, Terbinafine, or Miconazole applied for 2-4 weeks, breathable cotton clothing, and moisture control."
-    },
-    {
-      keywords: ['conjunctivitis', 'pink eye', 'red eye', 'eye discharge', 'sticky eyes'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Practice strict hand hygiene, avoid eye rubbing/contact lenses, and seek outpatient evaluation.",
-      department: "Primary Care / Ophthalmology",
-      medSupport: "Ocular Care: Lubricating artificial tears, cool compresses, antibiotic eye drops (if bacterial), or antihistamine drops (if allergic)."
-    },
-
-    // ==========================================
-    // 5. HEPATOLOGY, NEPHROLOGY, UROLOGY & GYN
-    // ==========================================
-    {
-      keywords: ['jaundice', 'yellow eyes', 'yellow skin', 'hepatitis', 'hepatitis a', 'hepatitis b', 'hepatitis c', 'elevated bilirubin'],
-      acuity: "Level 3 - Urgent / Priority",
-      color: "#f59e0b",
-      action: "Prompt liver function panel (LFTs), viral hepatitis serology, and abdominal ultrasound.",
-      department: "Gastroenterology & Hepatology",
-      medSupport: "Hepatology Care: Avoid alcohol and hepatotoxic drugs (including excess Paracetamol), hydration, low-fat diet, and targeted antiviral therapy if chronic Hep B/C."
-    },
-    {
-      keywords: ['fatty liver', 'nafld', 'mash', 'cirrhosis', 'liver fibrosis', 'ascites'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Outpatient hepatology follow-up, liver elastography (FibroScan), and metabolic risk management.",
-      department: "Hepatology / Internal Medicine",
-      medSupport: "Liver Health Care: Gradual weight loss, Mediterranean diet, strict alcohol abstinence, diabetes/lipid control, and periodic ultrasound surveillance."
-    },
-    {
-      keywords: ['chronic kidney disease', 'ckd', 'renal insufficiency', 'high creatinine', 'proteinuria', 'nephrotic syndrome', 'nephritis'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Outpatient nephrology monitoring of eGFR, urine albumin-to-creatinine ratio, and blood pressure.",
-      department: "Nephrology Clinic",
-      medSupport: "Renal Protective Care: Blood pressure control (ACE inhibitors/ARBs), SGLT2 inhibitors if indicated, sodium/protein moderation, and avoiding NSAIDs."
-    },
-    {
-      keywords: ['bph', 'benign prostatic hyperplasia', 'enlarged prostate', 'weak urine stream', 'nocturia', 'prostatitis'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Outpatient urology evaluation including PSA check, post-void residual ultrasound, and urinalysis.",
-      department: "Urology Outpatient Clinic",
-      medSupport: "Prostate Care: Alpha-blockers (Tamsulosin), 5-alpha reductase inhibitors (Finasteride), timed voiding, and limiting evening caffeine/fluids."
-    },
-    {
-      keywords: ['pcos', 'pcod', 'polycystic ovary syndrome', 'irregular periods', 'amenorrhea', 'dysmenorrhea', 'menstrual cramps', 'endometriosis', 'fibroids'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Outpatient gynecology evaluation for pelvic ultrasound and hormonal panel.",
-      department: "Gynecology & Women's Health",
-      medSupport: "Gynecologic Care: Cycle regulation therapies, insulin-sensitizing agents (Metformin for PCOS), NSAIDs/heat therapy for dysmenorrhea, and lifestyle nutrition."
-    },
-
-    // ==========================================
-    // 6. HEMATOLOGY & AUTOIMMUNE
-    // ==========================================
-    {
-      keywords: ['anemia', 'anaemia', 'iron deficiency', 'low hemoglobin', 'pale skin', 'pallor', 'low ferritin'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Schedule CBC, serum ferritin, iron studies, and Vitamin B12/folate panel to determine underlying cause.",
-      department: "Primary Care / Hematology",
-      medSupport: "Hematologic Care: Oral iron supplementation (Ferrous Sulfate with Vitamin C), Vitamin B12/folate if indicated, and iron-rich diet."
-    },
-    {
-      keywords: ['sickle cell', 'thalassemia', 'hemophilia', 'bleeding disorder', 'easy bruising', 'itp'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Specialized hematology outpatient management, genetic counseling, and preventative vaccination.",
-      department: "Hematology Clinic",
-      medSupport: "Inherited/Chronic Blood Care: Folic acid supplementation, Hydroxyurea (for sickle cell), hydration, and avoiding trauma or antiplatelet medications."
-    },
-    {
-      keywords: ['lupus', 'sle', 'systemic lupus erythematosus', 'sjogren', 'scleroderma', 'vasculitis', 'autoimmune disease', 'butterfly rash'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Outpatient rheumatology consultation for ANA/autoantibody profile, complement levels, and organ screening.",
-      department: "Rheumatology & Immunology",
-      medSupport: "Autoimmune Care: Hydroxychloroquine, tailored immunomodulators, sun protection (UV avoidance), and regular renal/cardiovascular monitoring."
-    },
-
-    // ==========================================
-    // 7. ENT, OPHTHALMOLOGY & DENTAL
-    // ==========================================
-    {
-      keywords: ['ear pain', 'earache', 'otitis media', 'otitis externa', 'swimmer ear', 'ear discharge', 'blocked ear', 'ear wax'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Outpatient otoscopy examination; keep ear canal dry and avoid cotton swabs.",
-      department: "ENT / Primary Care Clinic",
-      medSupport: "Otologic Care: Analgesics (Paracetamol/Ibuprofen), topical antibiotic/steroid ear drops (if outer ear), cerumen softeners, or oral antibiotics if bacterial otitis media."
-    },
-    {
-      keywords: ['tinnitus', 'ringing in ears', 'muffled hearing', 'meniere disease'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Schedule audiometry hearing assessment and ENT evaluation.",
-      department: "ENT & Audiology",
-      medSupport: "Audiologic Care: Pure-tone audiometry, noise protection, sound therapy masking, and low-sodium diet if Meniere's suspected."
-    },
-    {
-      keywords: ['nosebleed', 'epistaxis', 'bleeding nose'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Sit upright, lean slightly forward, and pinch soft part of nose continuously for 10-15 minutes. Seek urgent care if bleeding continues over 20 minutes.",
-      department: "Primary Care / ENT",
-      medSupport: "First Aid & Nasal Care: Direct nasal compression, cold compress on bridge of nose, saline nasal gel, and humidifier use."
-    },
-    {
-      keywords: ['cataract', 'glaucoma', 'dry eyes', 'eye strain', 'macular degeneration', 'diabetic retinopathy', 'blurry near vision'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Schedule comprehensive dilated eye exam and intraocular pressure (tonometry) check.",
-      department: "Ophthalmology Clinic",
-      medSupport: "Ophthalmic Care: Preservative-free lubricating drops, intraocular pressure-lowering drops (for glaucoma), UV-blocking eyewear, and annual retinal screening."
-    },
-    {
-      keywords: ['toothache', 'dental pain', 'cavity', 'gingivitis', 'bleeding gums', 'wisdom tooth', 'mouth ulcer', 'canker sore'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Schedule outpatient dental evaluation; maintain warm saltwater rinses.",
-      department: "Dental & Oral Medicine",
-      medSupport: "Oral Care: Warm saline rinses, topical benzocaine/antiseptic gel for mouth ulcers, Paracetamol/Ibuprofen, and professional dental restoration."
-    },
-
-    // ==========================================
-    // 8. ALLERGIES & GI
-    // ==========================================
-    {
-      keywords: ['allergy', 'allergies', 'allergic', 'hay fever', 'allergic rhinitis', 'pollen allergy', 'dust allergy', 'pet dander', 'food allergy', 'skin allergy', 'contact dermatitis', 'itchy eyes', 'watery eyes', 'allergic hives', 'mild allergic rash'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Manage with allergen avoidance, oral antihistamines, and nasal sprays.",
-      department: "Primary Care / Allergy Outpatient Clinic",
-      medSupport: "Allergy Management: Non-drowsy second-generation antihistamines (Cetirizine, Loratadine, Fexofenadine), intranasal corticosteroids (Fluticasone), saline nasal rinses, and topical hydrocortisone."
-    },
-    {
-      keywords: ['stomach pain', 'stomach ache', 'abdominal pain', 'belly ache', 'stomach cramp', 'gastric pain'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Manage with dietary modifications, hydration, and antacids.",
-      department: "Primary Care Outpatient Clinic",
-      medSupport: "Gastrointestinal Care: Antacids (Calcium Carbonate/Magnesium Hydroxide), warm compresses, bland diet (BRAT diet), and hydration."
-    },
-    {
-      keywords: ['bloating', 'bloated', 'abdominal distension', 'gas', 'flatulence', 'stomach gas'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Manage with dietary adjustments, simethicone, and gentle physical activity.",
-      department: "Primary Care / Home Care",
-      medSupport: "Digestive Support: Simethicone for gas relief, activated charcoal, peppermint oil capsules, herbal teas, and reducing carbonated beverages."
-    },
-    {
-      keywords: ['indigestion', 'dyspepsia', 'sour stomach', 'heavy stomach', 'postprandial fullness'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Manage with smaller meal portions, avoiding heavy fats, and over-the-counter antacids.",
-      department: "Primary Care / Routine Care",
-      medSupport: "Digestive Support: Antacids, H2 blockers (Famotidine), digestive enzyme supplements, and eating smaller, slower meals."
-    },
-    {
-      keywords: ['acid reflux', 'gerd', 'heartburn', 'acidic burps', 'regurgitation', 'chest burning'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Manage with lifestyle modifications, avoiding trigger foods, and acid reducers.",
-      department: "Primary Care Clinic",
-      medSupport: "Gastrointestinal Care: Proton pump inhibitors (PPIs like Omeprazole) or H2 blockers, elevating the head of the bed, and avoiding lying down after eating."
-    },
-    {
-      keywords: ['gastritis', 'stomach inflammation', 'lining irritation', 'peptic ulcer', 'stomach ulcer', 'duodenal ulcer', 'ulcer pain'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Outpatient clinical evaluation for H. pylori testing, mucosal protectants, and avoiding NSAIDs.",
-      department: "Gastroenterology / Primary Care",
-      medSupport: "Gastric & Ulcer Care: PPI therapy, Sucralfate, H. pylori eradication regimen (if positive), and eliminating spicy/acidic foods."
-    },
-    {
-      keywords: ['ibs', 'irritable bowel syndrome', 'spastic colon', 'functional bowel disorder', 'crohn disease', 'ulcerative colitis', 'ibd'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Outpatient gastroenterology management with dietary trigger tracking and targeted therapy.",
-      department: "Gastroenterology Clinic",
-      medSupport: "Bowel Management: Soluble fiber (psyllium), antispasmodics, low-FODMAP guidance (IBS), or anti-inflammatory mesalamine/biologics (IBD)."
-    },
-    {
-      keywords: ['constipation', 'hard stool', 'infrequent bowel movements', 'difficulty passing stool', 'hemorrhoids', 'piles', 'anal fissure'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Manage with increased water intake, dietary fiber, sitz baths, and mild osmotic laxatives.",
-      department: "Primary Care / Proctology",
-      medSupport: "Bowel & Anorectal Care: Polyethylene glycol (MiraLAX), psyllium fiber, warm sitz baths, topical soothing ointments, and hydration."
-    },
-    {
-      keywords: ['diarrhea', 'diarrhoea', 'loose stools', 'watery stools', 'stomach bug', 'gastroenteritis', 'stomach flu', 'food poisoning', 'nausea', 'queasiness'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Focus on oral rehydration solutions (ORS) and electrolyte balance. Seek care if lasting over 48 hours.",
-      department: "Primary Care / Home Care",
-      medSupport: "Rehydration Support: Oral rehydration salts (ORS), probiotics, ginger tea, bland BRAT diet, and small frequent sips of clear fluids."
-    },
-    {
-      keywords: ['celiac disease', 'gluten intolerance', 'gluten sensitivity', 'lactose intolerance'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Long-term dietary management with trigger avoidance and nutritional monitoring.",
-      department: "Gastroenterology / Outpatient Nutrition",
-      medSupport: "Dietary Care: Strict gluten-free diet (Celiac) or lactase enzyme supplements (Lactose intolerance), plus vitamin/mineral monitoring."
-    },
-
-    // ==========================================
-    // 9. DERMATOLOGY, METABOLIC, PULMONARY, CARDIO & NEURO
-    // ==========================================
-    {
-      keywords: ['hairfall', 'hair loss', 'alopecia', 'thinning hair', 'baldness', 'shedding hair', 'hair damage', 'receding hairline'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Manage with nutritional tracking, gentle hair care routines, and dermatologist evaluation if persistent.",
-      department: "Dermatology / Routine Outpatient Care",
-      medSupport: "Dermatological & Nutritional Care: Iron/ferritin, Vitamin D/B12, and thyroid screening, scalp care, minoxidil topical solutions (under medical advice), and balanced protein intake."
-    },
-    {
-      keywords: ['dry skin', 'skin dryness', 'dryness', 'flaky skin', 'chapped skin', 'rough skin', 'scaling skin', 'peeling skin', 'dandruff', 'flaky scalp', 'itchy scalp', 'seborrheic dermatitis'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Manage at home with barrier repair moisturizers, medicated shampoos, and adequate hydration.",
-      department: "Primary Care / Dermatology Care",
-      medSupport: "Dermatological Care: Ceramide-rich moisturizers, gentle fragrance-free cleansers, and ketoconazole or zinc pyrithione shampoo for scalp flaking."
-    },
-    {
-      keywords: ['eczema', 'psoriasis', 'dermatitis', 'rash', 'acne', 'rosacea', 'hives', 'urticaria', 'vitiligo', 'scabies'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Outpatient dermatology evaluation and skin barrier maintenance.",
-      department: "Dermatology Clinic",
-      medSupport: "Dermatological Care: Topical emollients, prescribed topical corticosteroids or retinoids/benzoyl peroxide (for acne), and gentle cleansers."
-    },
-    {
-      keywords: ['fatigue', 'tiredness', 'malaise', 'exhaustion', 'low energy', 'weakness', 'lethargy', 'chronic fatigue', 'dehydration', 'heat exhaustion'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Cool rest, oral rehydration, sleep hygiene review, and routine blood panels.",
-      department: "Primary Care Outpatient Clinic",
-      medSupport: "Systemic Screening: CBC, iron panel, TSH, vitamin D/B12 checks, electrolyte replenishment, and sleep optimization."
-    },
-    {
-      keywords: ['diabetes', 'diabeties', 'diabetic', 'blood sugar', 'hyperglycemia', 'hypoglycemia', 'insulin', 'type 1 diabetes', 'type 2 diabetes', 'insulin resistance', 'prediabetes'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Scheduled outpatient endocrinology monitoring, HbA1c tracking, and lifestyle management.",
-      department: "Endocrinology / Primary Care Clinic",
-      medSupport: "Chronic Metabolic Care: Regular blood glucose logging, HbA1c every 3 months, carbohydrate-controlled nutrition, and prescribed Metformin or Insulin."
-    },
-    {
-      keywords: ['hypothyroid', 'hyperthyroid', 'thyroid', 'hashimoto', 'graves disease', 'cushing', 'addison', 'goiter', 'high cholesterol', 'hyperlipidemia', 'dyslipidemia'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Scheduled outpatient hormone/lipid monitoring and medication adherence.",
-      department: "Endocrinology / Internal Medicine",
-      medSupport: "Endocrine & Lipid Care: Levothyroxine or anti-thyroid therapy (monitored via TSH/T4), or statins/heart-healthy diet for dyslipidemia."
-    },
-    {
-      keywords: ['arthritis', 'arthiritis', 'osteoarthritis', 'rheumatoid', 'joint pain', 'gout', 'fibromyalgia', 'osteoporosis', 'joint stiffness', 'joint swelling', 'ankylosing spondylitis'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Outpatient rheumatology/orthopedic care, physical therapy, and joint conditioning.",
-      department: "Rheumatology / Orthopedic Clinic",
-      medSupport: "Musculoskeletal Care: Physical therapy, low-impact exercise, calcium/vitamin D, urate-lowering therapy (for gout), and topical/oral anti-inflammatories."
-    },
-    {
-      keywords: ['muscle strain', 'sprain', 'back pain', 'neck pain', 'shoulder pain', 'knee pain', 'heel pain', 'plantar fasciitis', 'sciatica', 'muscle soreness', 'carpal tunnel', 'tendonitis'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Manage with RICE protocol, physical therapy stretching, and ergonomic adjustments.",
-      department: "Primary Care / Physical Therapy",
-      medSupport: "Orthopedic Routine Care: Rest, ice, compression, elevation (RICE), ergonomic adjustments, targeted stretching, and topical analgesic gels."
-    },
-    {
-      keywords: ['asthma', 'asthama', 'astma', 'wheezing', 'copd', 'bronchitis', 'emphysema', 'bronchiectasis', 'cystic fibrosis', 'chronic cough', 'sleep apnea'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Outpatient pulmonology follow-up, spirometry, and inhaler/CPAP adherence.",
-      department: "Pulmonology Clinic",
-      medSupport: "Pulmonary Care: Trigger avoidance, maintenance controller inhalers, accessible rescue bronchodilators, and pulmonary rehabilitation."
-    },
-    {
-      keywords: ['cold', 'cough', 'runny nose', 'throat', 'sore', 'flu', 'influenza', 'sinusitis', 'sinus', 'rhinitis', 'tonsillitis', 'laryngitis', 'common cold', 'sneezing', 'nasal congestion'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Manage at home with rest and hydration. Consult primary care if symptoms persist over 5-7 days.",
-      department: "Primary Care Clinic / Home Care",
-      medSupport: "Upper Respiratory Care: Warm saline gargles, steam inhalation, lozenges, decongestants, and Paracetamol for mild fever/body aches."
-    },
-    {
-      keywords: ['hypertension', 'high blood pressure', 'bp', 'atherosclerosis', 'arrhythmia', 'angina', 'heart failure', 'elevated bp', 'palpitations', 'varicose veins'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Scheduled outpatient cardiology monitoring, daily BP logging, and lifestyle modifications.",
-      department: "Cardiology / Primary Care Clinic",
-      medSupport: "Cardiovascular Care: Daily blood pressure log, DASH low-sodium diet, regular aerobic exercise, and adherence to prescribed antihypertensives."
-    },
-    {
-      keywords: ['headache', 'migraine', 'migrane', 'tension headache', 'cluster headache', 'neuropathy', 'peripheral neuropathy', 'epilepsy', 'parkinson', 'alzheimer', 'dementia', 'multiple sclerosis'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Outpatient neurology consultation, symptom diary tracking, and maintenance therapy.",
-      department: "Neurology Outpatient Clinic",
-      medSupport: "Neurological Routine Care: Migraine abortive/preventive therapy, quiet dark rest, neuropathic pain agents, or structured neurological rehabilitation."
-    },
-    {
-      keywords: ['anxiety', 'depression', 'insomnia', 'stress', 'panic disorder', 'adhd', 'bipolar', 'ptsd', 'ocd', 'sleep disorder', 'burnout'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Outpatient behavioral health consultation, psychotherapy, and structured sleep/stress routines.",
-      department: "Psychiatry & Behavioral Health",
-      medSupport: "Mental Wellness & Sleep Support: Cognitive behavioral therapy (CBT), consistent sleep hygiene, mindfulness, and physician-supervised pharmacotherapy if indicated."
+      action: "Manage with rest, hydration, lifestyle adjustments, and scheduled outpatient care.",
+      department: "Primary Care / Specialty Outpatient",
+      medSupport: "Routine Outpatient Care: Prescribed maintenance therapy, lifestyle/dietary control, and standard symptomatic relief."
     }
   ];
 
+  // --- CRITICAL EMERGENCIES (LEVEL 1) ---
   const criticalKeywords = [
     'chest pain', 'heart attack', 'myocardial infarction', 'unconscious', 'unresponsive',
     'stroke', 'cerebrovascular accident', 'cva', 'severe bleeding', 'hemorrhage', 'anaphylaxis',
@@ -907,6 +598,7 @@
     'animal bite', 'dog bite', 'rabies exposure', 'severe sting', 'multiple bee stings', 'scorpion sting', 'spider bite'
   ];
 
+  // --- URGENT CONDITIONS (LEVEL 3) ---
   const urgentKeywords = [
     'dizzy', 'dizziness', 'vertigo', 'lightheaded', 'lightheadedness', 'room spinning',
     'spinning head', 'giddy', 'giddiness', 'unsteady', 'woozy',
@@ -924,6 +616,88 @@
     'pressure ulcer', 'bedsore'
   ];
 
+  // --- 768-D BIO_CLINICALBERT SEMANTIC PROTOTYPES FOR UNSTRUCTURED LONG SENTENCES ---
+  const semanticPrototypes = [
+    {
+      label: "Acute Fever & Systemic Infection",
+      text: "patient has fever high temperature chills shivering body ache feeling hot sick unwell",
+      triage: {
+        acuity: "Level 3 - Urgent / Priority",
+        color: "#f59e0b",
+        action: "Monitor temperature, hydrate with fluids/ORS, and seek clinical evaluation if fever is high or lasts over 48 hours.",
+        department: "Urgent Care / Internal Medicine",
+        medSupport: "Fever & Hydration Care: Paracetamol for fever/aches, oral rehydration fluids, rest, and diagnostic fever screening."
+      }
+    },
+    {
+      label: "Cardiopulmonary Emergency",
+      text: "chest pain chest pressure tightness radiating arm shortness of breath difficulty breathing trouble breathing",
+      triage: {
+        acuity: "Level 1 - Resuscitation / Critical Emergency",
+        color: "#ef4444",
+        action: "Immediate emergency intervention required. Activate cardiac/respiratory emergency protocol.",
+        department: "Emergency Department (ED)",
+        medSupport: "CRITICAL: Avoid oral self-medication. Immediate ECG, oxygen saturation, airway, and hemodynamic support."
+      }
+    },
+    {
+      label: "Neurological / Stroke Presentation",
+      text: "sudden numbness weakness one side face drooping slurred speech confusion dizziness fainting blackout",
+      triage: {
+        acuity: "Level 1 - Resuscitation / Critical Emergency",
+        color: "#ef4444",
+        action: "Immediate emergency stroke/neurological assessment required.",
+        department: "Emergency Department (ED) - Stroke Unit",
+        medSupport: "CRITICAL: Urgent neuroimaging (CT/MRI), airway protection, and time-critical stroke protocol."
+      }
+    },
+    {
+      label: "Gastrointestinal / Stomach Presentation",
+      text: "stomach pain belly ache abdominal cramps nausea vomiting loose motions diarrhea bloating acidity gas",
+      triage: {
+        acuity: "Level 5 - Non-Urgent / Routine",
+        color: "#38bdf8",
+        action: "Manage with oral rehydration salts (ORS), bland diet, and antacids; seek urgent care if severe pain or blood appears.",
+        department: "Primary Care / Gastroenterology Clinic",
+        medSupport: "Gastrointestinal Care: ORS/electrolytes, antacids/PPIs, simethicone, and bland BRAT diet."
+      }
+    },
+    {
+      label: "Oncology / Tumor / Suspicious Growth",
+      text: "cancer tumor malignancy lump swelling unexplained weight loss biopsy oncology therapy",
+      triage: {
+        acuity: "Level 3 - Urgent / Priority Oncology",
+        color: "#f59e0b",
+        action: "Prompt specialist oncology referral for diagnostic imaging and tissue biopsy.",
+        department: "Comprehensive Oncology Clinic",
+        medSupport: "Oncology Care: Cross-sectional imaging (CT/MRI/PET), histopathology biopsy, and multidisciplinary oncology review."
+      }
+    },
+    {
+      label: "Nutritional & Micronutrient Deficiency",
+      text: "vitamin deficiency low iron anemia low calcium magnesium potassium zinc malnutrition weakness fatigue",
+      triage: {
+        acuity: "Level 5 - Non-Urgent / Routine",
+        color: "#38bdf8",
+        action: "Schedule targeted blood panels (CBC, Vitamin D, B12, iron, electrolytes) for guided supplementation.",
+        department: "Primary Care / Clinical Nutrition",
+        medSupport: "Micronutrient Care: Targeted vitamin/mineral repletion and balanced clinical nutrition plan."
+      }
+    },
+    {
+      label: "Sensory, Mobility, or Neurodevelopmental Disability",
+      text: "hearing loss deafness vision loss blindness speech difficulty paralysis mobility disability autism cerebral palsy",
+      triage: {
+        acuity: "Level 5 - Non-Urgent / Routine",
+        color: "#38bdf8",
+        action: "Outpatient rehabilitation, audiology/ophthalmology/speech therapy, and assistive device evaluation.",
+        department: "Physical Medicine, Rehabilitation & Specialist Clinic",
+        medSupport: "Rehabilitation & Assistive Care: Tailored therapy, mobility/hearing/visual aids, and accessible care planning."
+      }
+    }
+  ];
+
+  // Pre-compile regexes once at startup for instant matching
   const compiledCritical = criticalKeywords.map(compilePhrase);
   const compiledSevere = compilePhrase('severe');
   const compiledSevereTriggers = ['breath', 'pain', 'bleed', 'headache'].map(compilePhrase);
@@ -933,73 +707,97 @@
     patterns: record.keywords.map(compilePhrase)
   }));
 
-  function evaluateTriage(text) {
-    const isCriticalMatch =
-      compiledCritical.some(rx => rx.test(text)) ||
-      (compiledSevere.test(text) && compiledSevereTriggers.some(rx => rx.test(text)));
+  const ACUITY_RANK = { "Level 1": 3, "Level 3": 2, "Level 5": 1 };
+  function getRank(acuityStr) {
+    if (acuityStr.startsWith("Level 1")) return ACUITY_RANK["Level 1"];
+    if (acuityStr.startsWith("Level 3")) return ACUITY_RANK["Level 3"];
+    return ACUITY_RANK["Level 5"];
+  }
 
-    if (isCriticalMatch) {
+  function evaluateSingleClause(clause) {
+    if (
+      compiledCritical.some(rx => rx.test(clause)) ||
+      (compiledSevere.test(clause) && compiledSevereTriggers.some(rx => rx.test(clause)))
+    ) {
       return {
         acuity: "Level 1 - Resuscitation / Critical Emergency",
         color: "#ef4444",
         action: "Immediate emergency intervention required. Activate stroke/trauma protocol.",
         department: "Emergency Department (ED)",
-        medSupport: "CRITICAL: Avoid oral self-medication. Prepare for emergency airway, neuroimaging, and hemodynamic support."
+        medSupport: "CRITICAL: Avoid oral self-medication. Prepare for emergency airway, neuroimaging, and hemodynamic support.",
+        matchSource: "Deterministic Critical Rule"
       };
     }
 
-    if (compiledUrgent.some(rx => rx.test(text))) {
+    if (compiledUrgent.some(rx => rx.test(clause))) {
       return {
         acuity: "Level 3 - Urgent / Priority",
         color: "#f59e0b",
         action: "Prompt clinical evaluation recommended within 30-60 minutes. Sit or lie down.",
         department: "Urgent Care / Ambulatory Clinic",
-        medSupport: "Targeted urgent care options: Vitals check, diagnostic labs/imaging, electrolytes, or fast-acting targeted therapy."
+        medSupport: "Targeted urgent care options: Vitals check, diagnostic labs/imaging, electrolytes, or fast-acting targeted therapy.",
+        matchSource: "Deterministic Urgent Rule"
       };
     }
 
     const matchedRecord = compiledDatabase.find(record =>
-      record.patterns.some(rx => rx.test(text))
+      record.patterns.some(rx => rx.test(clause))
     );
 
     if (matchedRecord) {
-      return matchedRecord;
+      return {
+        ...matchedRecord,
+        matchSource: "Clinical / Oncology / Deficiency / Disability KB"
+      };
     }
 
-    return {
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Manage at home with rest, lifestyle modifications, and outpatient monitoring.",
-      department: "Primary Care Clinic / Specialized Outpatient Care",
-      medSupport: "General Routine Care: Nutrition, hydration, and standard OTC options."
-    };
+    return null;
   }
 
-  function renderReport(text, triage, elapsedMs, vectorDim, modeNote) {
-    const safeText = escapeHtml(text);
-    output.innerHTML =
-      `🧬 <b>FUTURE-GEN AI HEALTHCARE INTELLIGENCE REPORT</b><br><br>` +
-      `──────────────────────────────────────────<br>` +
-      `• <b>Evaluated Clinical Input:</b> "${safeText}"<br>` +
-      `• <b>Acuity Classification:</b> <span style="color: ${triage.color}; font-weight: bold;">${triage.acuity}</span><br>` +
-      `• <b>Optimized Care Pathway:</b> ${triage.department}<br>` +
-      `• <b>Recommended Clinical Action:</b> ${triage.action}<br>` +
-      `• <b>Pharmaceutical &amp; Supportive Classes:</b> ${triage.medSupport}<br>` +
-      `──────────────────────────────────────────<br>` +
-      `• <b>Neural Engine:</b> Bio_ClinicalBERT Edge Quantized (${modeNote})<br>` +
-      `• <b>Inference Latency:</b> ${elapsedMs} ms<br>` +
-      `• <b>Vector Matrix Space:</b> ${vectorDim}-D tensor matrix<br>` +
-      `• <b>Data Privacy Status:</b> 100% On-Device (Zero Cloud Transmission)<br><br>` +
-      `<i>Disclaimer: AI prototype for science exhibition demonstration. Requires physician verification.</i>`;
+  function evaluateLongSentenceRules(fullText) {
+    const clauses = splitIntoClauses(fullText);
+    let bestMatch = null;
+    let bestRank = 0;
+
+    for (const candidate of [fullText, ...clauses]) {
+      const match = evaluateSingleClause(candidate);
+      if (match) {
+        const rank = getRank(match.acuity);
+        if (rank > bestRank) {
+          bestRank = rank;
+          bestMatch = match;
+        }
+      }
+    }
+
+    return bestMatch;
+  }
+
+  async function embedText(pipe, str) {
+    const out = await pipe(str, {
+      pooling: 'mean',
+      normalize: true,
+      truncation: true,
+      max_length: 512
+    });
+    return out.tolist()[0];
   }
 
   async function ensureModelLoaded() {
     if (extractor) return extractor;
     if (!modelLoadingPromise) {
       modelLoadingPromise = pipeline('feature-extraction', './model', { local_files_only: true })
-        .then(pipe => {
+        .then(async pipe => {
           extractor = pipe;
-          engineStatus = "Local Bio_ClinicalBERT Active";
+          engineStatus = "Local Bio_ClinicalBERT Active (768-D)";
+          if (!prototypeVectors) {
+            prototypeVectors = await Promise.all(
+              semanticPrototypes.map(async proto => ({
+                ...proto,
+                vector: await embedText(pipe, proto.text)
+              }))
+            );
+          }
           return pipe;
         })
         .catch(err => {
@@ -1010,9 +808,64 @@
     return modelLoadingPromise;
   }
 
+  async function classifyWithEmbeddings(pipe, userText) {
+    if (!prototypeVectors) {
+      prototypeVectors = await Promise.all(
+        semanticPrototypes.map(async proto => ({
+          ...proto,
+          vector: await embedText(pipe, proto.text)
+        }))
+      );
+    }
+
+    const userVec = await embedText(pipe, userText);
+    let bestProto = semanticPrototypes[3]; // GI/Routine fallback
+    let bestScore = -1;
+
+    for (const proto of prototypeVectors) {
+      const score = cosineSimilarity(userVec, proto.vector);
+      if (score > bestScore) {
+        bestScore = score;
+        bestProto = proto;
+      }
+    }
+
+    return {
+      userVec,
+      bestScore,
+      triage: {
+        ...bestProto.triage,
+        matchSource: `768-D Bio_ClinicalBERT Semantic (${bestProto.label}, sim=${bestScore.toFixed(3)})`
+      }
+    };
+  }
+
+  function renderReport(text, triage, elapsedMs, vectorDim, similarityNote) {
+    const safeText = escapeHtml(text);
+    const simLine = similarityNote ? `• <b>Semantic Alignment:</b> ${escapeHtml(similarityNote)}<br>` : '';
+
+    output.innerHTML =
+      `🧬 <b>FUTURE-GEN AI HEALTHCARE INTELLIGENCE REPORT</b><br><br>` +
+      `──────────────────────────────────────────<br>` +
+      `• <b>Evaluated Clinical Input:</b> "${safeText}"<br>` +
+      `• <b>Acuity Classification:</b> <span style="color: ${triage.color}; font-weight: bold;">${triage.acuity}</span><br>` +
+      `• <b>Optimized Care Pathway:</b> ${triage.department}<br>` +
+      `• <b>Recommended Clinical Action:</b> ${triage.action}<br>` +
+      `• <b>Pharmaceutical &amp; Supportive Classes:</b> ${triage.medSupport}<br>` +
+      `──────────────────────────────────────────<br>` +
+      `• <b>Classification Basis:</b> ${escapeHtml(triage.matchSource || 'Rule Engine')}<br>` +
+      simLine +
+      `• <b>Neural Engine:</b> medicore/Bio_ClinicalBERT (${engineStatus})<br>` +
+      `• <b>Inference Latency:</b> ${elapsedMs} ms<br>` +
+      `• <b>Vector Matrix Space:</b> ${vectorDim}-D tensor matrix (max 512 tokens)<br>` +
+      `• <b>Data Privacy Status:</b> 100% On-Device (Zero Cloud Transmission)<br><br>` +
+      `<i>Disclaimer: AI prototype for science exhibition demonstration. Requires physician verification.</i>`;
+  }
+
+  // Pre-warm ./model when idle so first click is faster
   const warmUp = () => {
     ensureModelLoaded().catch(() => {
-      engineStatus = "Fast Local Rule Mode (./model not yet cached)";
+      engineStatus = "Fast Local Rule Mode (./model unavailable)";
     });
   };
   if ('requestIdleCallback' in window) {
@@ -1029,32 +882,62 @@
     }
 
     const startTime = performance.now();
-    const triage = evaluateTriage(text);
+    let activeTriage = evaluateLongSentenceRules(text);
+
+    // 1. Render immediate result if clause/rule match found (or provisional routine while embedding runs)
+    const provisionalTriage = activeTriage || {
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Manage at home with rest, lifestyle modifications, and outpatient monitoring.",
+      department: "Primary Care Clinic / Specialized Outpatient Care",
+      medSupport: "General Routine Care: Nutrition, hydration, and standard OTC options.",
+      matchSource: "Evaluating 768-D Bio_ClinicalBERT Embeddings..."
+    };
 
     renderReport(
       text,
-      triage,
+      provisionalTriage,
       Math.round(performance.now() - startTime),
       lastVectorDim,
-      extractor ? engineStatus : "Instant Triage + Background Embedding"
+      lastSimilarity
     );
 
-    if (extractor) {
-      try {
-        const embeddings = await extractor(text, { pooling: 'mean', normalize: true });
-        lastVectorDim = embeddings.tolist()[0].length;
-        renderReport(text, triage, Math.round(performance.now() - startTime), lastVectorDim, engineStatus);
-      } catch (err) {
-        console.error(err);
+    // 2. Run 768-D Bio_ClinicalBERT embedding (and use semantic prototype match if no keyword matched)
+    try {
+      const pipe = await ensureModelLoaded();
+      const { userVec, bestScore, triage: semanticTriage } = await classifyWithEmbeddings(pipe, text);
+      lastVectorDim = userVec.length;
+      lastSimilarity = `Cosine similarity ${bestScore.toFixed(3)} (768-D)`;
+
+      if (!activeTriage) {
+        activeTriage = semanticTriage;
       }
-    } else {
-      ensureModelLoaded()
-        .then(async pipe => {
-          const embeddings = await pipe(text, { pooling: 'mean', normalize: true });
-          lastVectorDim = embeddings.tolist()[0].length;
-          renderReport(text, triage, Math.round(performance.now() - startTime), lastVectorDim, engineStatus);
-        })
-        .catch(() => {});
+
+      renderReport(
+        text,
+        activeTriage,
+        Math.round(performance.now() - startTime),
+        lastVectorDim,
+        lastSimilarity
+      );
+    } catch (err) {
+      if (!activeTriage) {
+        activeTriage = {
+          acuity: "Level 5 - Non-Urgent / Routine",
+          color: "#38bdf8",
+          action: "Manage at home with rest, lifestyle modifications, and outpatient monitoring.",
+          department: "Primary Care Clinic / Specialized Outpatient Care",
+          medSupport: "General Routine Care: Nutrition, hydration, and standard OTC options.",
+          matchSource: "Default Routine Fallback (Model Load Error)"
+        };
+      }
+      renderReport(
+        text,
+        activeTriage,
+        Math.round(performance.now() - startTime),
+        lastVectorDim,
+        `Fallback (${err.message})`
+      );
     }
   });
 </script>
