@@ -111,7 +111,6 @@
       background: #030712;
       border: 1px solid var(--border-color);
       font-size: 0.9rem;
-      white-space: pre-line;
       line-height: 1.6;
     }
     .footer {
@@ -126,11 +125,11 @@
   <div class="card">
     <h1>MediCore Clinical Triage</h1>
     <!-- Update your name and project details here -->
-    <div class="subtitle">Designed & Developed by Prabodh • Science Exhibition Demo</div>
-    
+    <div class="subtitle">Designed &amp; Developed by Prabodh &bull; Science Exhibition Demo</div>
+
     <label for="symptoms">Patient Clinical Presentation / Observations:</label>
     <textarea id="symptoms" placeholder="e.g., Acute chest discomfort radiating to left arm with diaphoresis and shortness of breath..."></textarea>
-    
+
     <div class="tags-section">
       <span class="tags-label">Active Clinical Classification Tags</span>
       <span class="tag-pill">Cardiac Emergency</span>
@@ -140,16 +139,16 @@
     </div>
 
     <button id="analyzeBtn">Execute Local Inference</button>
-    
+
     <div id="output">Status: Ready. Model configured to load locally from your repository folder.</div>
   </div>
 
-  <div class="footer">100% Offline-Capable • Zero External CDN Dependency</div>
+  <div class="footer">100% Offline-Capable &bull; Zero External CDN Dependency</div>
 
 <script type="module">
   import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.4.0';
 
-  // 🔑 MANDATORY: Enable local models and restrict remote lookups for browser execution
+  // Enable local models and restrict remote lookups for browser execution
   env.allowLocalModels = true;
   env.allowRemoteModels = false;
 
@@ -157,6 +156,20 @@
   const input = document.getElementById('symptoms');
   const output = document.getElementById('output');
   let extractor = null;
+
+  function escapeHtml(str) {
+    return str
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;');
+  }
+
+  function hasPhrase(text, phrase) {
+    const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(?<!\\w)${escaped}(?!\\w)`, 'i');
+    return regex.test(text);
+  }
 
   // --- MASSIVELY SCALED COMPREHENSIVE CLINICAL DATABASE ---
   const clinicalDatabase = [
@@ -391,6 +404,41 @@
     }
   ];
 
+  // --- CRITICAL EMERGENCIES (LEVEL 1) ---
+  const criticalKeywords = [
+    'chest pain', 'heart attack', 'myocardial infarction', 'unconscious', 'unresponsive',
+    'stroke', 'cerebrovascular accident', 'cva', 'severe bleeding', 'hemorrhage', 'anaphylaxis',
+    'anaphylactic shock', 'throat swelling', 'airway swelling', 'tongue swelling', 'epipen',
+    'seizure', 'epileptic fit', 'poisoning', 'overdose', 'shortness of breath', 'difficulty breathing',
+    'cant breathe', "can't breathe", 'dyspnea', 'respiratory arrest', 'cardiac arrest', 'severe trauma',
+    'diabetic ketoacidosis', 'dka', 'hypertensive crisis', 'massive bleeding', 'blue lips', 'cyanosis',
+    'sudden paralysis', 'paralysis', 'facial drooping', 'face drooping', 'slurred speech',
+    'speech slurring', 'slurring', 'speech difficulty', 'trouble speaking', 'cant speak', "can't speak",
+    'numb', 'numbness', 'tingling', 'one side weak', 'arm weakness', 'loss of balance',
+    'sudden confusion', 'blurred vision', 'vision loss', 'double vision',
+    'faint', 'fainting', 'passed out', 'blackout', 'blacking out', 'syncope', 'collapsed',
+    'severe head injury', 'internal bleeding', 'choking', 'severe burns', 'electric shock',
+    'septic shock', 'acute appendicitis', 'bowel perforation',
+    'snake bite', 'snakebite', 'venom', 'venomous bite', 'poisonous bite',
+    'animal bite', 'severe sting', 'multiple bee stings', 'scorpion sting', 'spider bite'
+  ];
+
+  // --- URGENT CONDITIONS (LEVEL 3) ---
+  const urgentKeywords = [
+    'dizzy', 'dizziness', 'vertigo', 'lightheaded', 'lightheadedness', 'room spinning',
+    'spinning head', 'giddy', 'giddiness', 'unsteady', 'woozy',
+    'high fever', 'persistent vomiting', 'vomiting', 'severe abdominal pain', 'fracture', 'broken bone',
+    'deep wound', 'acute asthma attack', 'asthma attack', 'asthama attack', 'astma attack',
+    'allergy attack', 'allergy atttack', 'allergic attack', 'severe allergy', 'severe allergic reaction',
+    'acute allergic reaction', 'angioedema', 'facial swelling', 'swollen lips', 'lip swelling',
+    'severe hives', 'widespread hives', 'allergic flare up',
+    'uncontrolled bleeding', 'severe migraine', 'severe migrane', 'kidney stone', 'renal colic',
+    'severe burn', 'pneumonia', 'pnuemonia', 'severe dehydration', 'acute chest infection',
+    'high blood pressure spike', 'concussion', 'tachycardia', 'severe back spasm',
+    'blood in urine', 'bloody stool', 'cellulitis', 'dislocated joint', 'acute cholecystitis',
+    'severe ear infection', 'gallbladder pain', 'pancreatitis'
+  ];
+
   btn.addEventListener('click', async () => {
     const text = input.value.trim();
     if (!text) {
@@ -409,48 +457,14 @@
       const embeddings = await extractor(text, { pooling: 'mean', normalize: true });
       const vectorData = embeddings.tolist()[0];
       const lower = text.toLowerCase();
-      
+
       let acuity, color, action, department, medSupport;
 
-      // --- CRITICAL EMERGENCIES (LEVEL 1) ---
-      const criticalKeywords = [
-        'chest pain', 'heart attack', 'myocardial infarction', 'unconscious', 'unresponsive', 
-        'stroke', 'cerebrovascular accident', 'cva', 'severe bleeding', 'hemorrhage', 'anaphylaxis', 
-        'anaphylactic shock', 'throat swelling', 'airway swelling', 'tongue swelling', 'epipen',
-        'seizure', 'epileptic fit', 'poisoning', 'overdose', 'shortness of breath', 'difficulty breathing', 
-        'cant breathe', "can't breathe", 'dyspnea', 'respiratory arrest', 'cardiac arrest', 'severe trauma', 
-        'diabetic ketoacidosis', 'dka', 'hypertensive crisis', 'massive bleeding', 'blue lips', 'cyanosis', 
-        'sudden paralysis', 'paralysis', 'facial drooping', 'face drooping', 'slurred speech', 
-        'speech slurring', 'slurring', 'speech difficulty', 'trouble speaking', 'cant speak', "can't speak",
-        'numb', 'numbness', 'tingling', 'one side weak', 'arm weakness', 'loss of balance',
-        'sudden confusion', 'blurred vision', 'vision loss', 'double vision',
-        'faint', 'fainting', 'passed out', 'blackout', 'blacking out', 'syncope', 'collapsed',
-        'severe head injury', 'internal bleeding', 'choking', 'severe burns', 'electric shock', 
-        'septic shock', 'acute appendicitis', 'bowel perforation',
-        'snake bite', 'snakebite', 'venom', 'venomous bite', 'poisonous bite', 
-        'animal bite', 'severe sting', 'multiple bee stings', 'scorpion sting', 'spider bite'
-      ];
+      const isCriticalMatch =
+        criticalKeywords.some(keyword => hasPhrase(lower, keyword)) ||
+        (hasPhrase(lower, 'severe') && ['breath', 'pain', 'bleed', 'headache'].some(w => hasPhrase(lower, w)));
 
-      // --- URGENT CONDITIONS (LEVEL 3) ---
-      const urgentKeywords = [
-        'dizzy', 'dizziness', 'vertigo', 'lightheaded', 'lightheadedness', 'room spinning', 
-        'spinning head', 'giddy', 'giddiness', 'unsteady', 'woozy',
-        'high fever', 'persistent vomiting', 'vomiting', 'severe abdominal pain', 'fracture', 'broken bone', 
-        'deep wound', 'acute asthma attack', 'asthma attack', 'asthama attack', 'astma attack', 
-        'allergy attack', 'allergy atttack', 'allergic attack', 'severe allergy', 'severe allergic reaction', 
-        'acute allergic reaction', 'angioedema', 'facial swelling', 'swollen lips', 'lip swelling', 
-        'severe hives', 'widespread hives', 'allergic flare up',
-        'uncontrolled bleeding', 'severe migraine', 'severe migrane', 'kidney stone', 'renal colic', 
-        'severe burn', 'pneumonia', 'pnuemonia', 'severe dehydration', 'acute chest infection', 
-        'high blood pressure spike', 'concussion', 'tachycardia', 'severe back spasm', 
-        'blood in urine', 'bloody stool', 'cellulitis', 'dislocated joint', 'acute cholecystitis', 
-        'severe ear infection', 'gallbladder pain', 'pancreatitis'
-      ];
-
-      let isCriticalMatch = criticalKeywords.some(keyword => lower.includes(keyword)) || 
-                           (lower.includes('severe') && (lower.includes('breath') || lower.includes('pain') || lower.includes('bleed') || lower.includes('headache')));
-      
-      let isUrgentMatch = urgentKeywords.some(keyword => lower.includes(keyword));
+      const isUrgentMatch = urgentKeywords.some(keyword => hasPhrase(lower, keyword));
 
       if (isCriticalMatch) {
         acuity = "Level 1 - Resuscitation / Critical Emergency";
@@ -458,17 +472,15 @@
         action = "Immediate emergency intervention required. Activate stroke/trauma protocol.";
         department = "Emergency Department (ED)";
         medSupport = "CRITICAL: Avoid oral self-medication. Prepare for emergency airway, neuroimaging, and hemodynamic support.";
-      } 
-      else if (isUrgentMatch) {
+      } else if (isUrgentMatch) {
         acuity = "Level 3 - Urgent / Priority";
         color = "#f59e0b";
         action = "Prompt clinical evaluation recommended within 30-60 minutes. Sit or lie down.";
         department = "Urgent Care / Ambulatory Clinic";
         medSupport = "Targeted urgent care options: Vitals check, electrolytes, vestibular suppressants, or fast-acting antihistamines.";
-      }
-      else {
-        let matchedRecord = clinicalDatabase.find(record => 
-          record.keywords.some(kw => lower.includes(kw))
+      } else {
+        const matchedRecord = clinicalDatabase.find(record =>
+          record.keywords.some(kw => hasPhrase(lower, kw))
         );
 
         if (matchedRecord) {
@@ -486,19 +498,21 @@
         }
       }
 
-      output.innerHTML = `🧬 <b>FUTURE-GEN AI HEALTHCARE INTELLIGENCE REPORT</b><br><br>` +
-                         `──────────────────────────────────────────<br>` +
-                         `• <b>Evaluated Clinical Input:</b> "${text}"<br>` +
-                         `• <b>Acuity Classification:</b> <span style="color: ${color}; font-weight: bold;">${acuity}</span><br>` +
-                         `• <b>Optimized Care Pathway:</b> ${department}<br>` +
-                         `• <b>Recommended Clinical Action:</b> ${action}<br>` +
-                         `• <b>Pharmaceutical & Supportive Classes:</b> ${medSupport}<br>` +
-                         `──────────────────────────────────────────<br>` +
-                         `• <b>Neural Engine:</b> Bio_ClinicalBERT Edge Quantized<br>` +
-                         `• <b>Vector Matrix Space:</b> ${vectorData.length}-D tensor matrix processed<br>` +
-                         `• <b>Data Privacy Status:</b> 100% On-Device (Zero Cloud Transmission)<br><br>` +
-                         `<i>Disclaimer: AI prototype for science exhibition demonstration. Requires physician verification.</i>`;
+      const safeText = escapeHtml(text);
 
+      output.innerHTML =
+        `🧬 <b>FUTURE-GEN AI HEALTHCARE INTELLIGENCE REPORT</b><br><br>` +
+        `──────────────────────────────────────────<br>` +
+        `• <b>Evaluated Clinical Input:</b> "${safeText}"<br>` +
+        `• <b>Acuity Classification:</b> <span style="color: ${color}; font-weight: bold;">${acuity}</span><br>` +
+        `• <b>Optimized Care Pathway:</b> ${department}<br>` +
+        `• <b>Recommended Clinical Action:</b> ${action}<br>` +
+        `• <b>Pharmaceutical &amp; Supportive Classes:</b> ${medSupport}<br>` +
+        `──────────────────────────────────────────<br>` +
+        `• <b>Neural Engine:</b> Bio_ClinicalBERT Edge Quantized<br>` +
+        `• <b>Vector Matrix Space:</b> ${vectorData.length}-D tensor matrix processed<br>` +
+        `• <b>Data Privacy Status:</b> 100% On-Device (Zero Cloud Transmission)<br><br>` +
+        `<i>Disclaimer: AI prototype for science exhibition demonstration. Requires physician verification.</i>`;
     } catch (err) {
       output.textContent = "Error Details: " + err.message;
       console.error(err);
