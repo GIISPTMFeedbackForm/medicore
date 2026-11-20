@@ -135,6 +135,7 @@
       <span class="tag-pill">Neurological / Stroke</span>
       <span class="tag-pill">Oncology &amp; Hematology</span>
       <span class="tag-pill">Nutritional Deficiencies</span>
+      <span class="tag-pill">Disabilities &amp; Rehab</span>
       <span class="tag-pill">Routine Ambulatory</span>
     </div>
 
@@ -146,7 +147,7 @@
   <div class="footer">Local-First &bull; Low-Bandwidth Ready</div>
 
 <script type="module">
-  // 1. Load local vendored bundle first (0 bytes over network); fallback to CDN only if missing
+  // Load local vendored bundle first (0 bytes over network); fallback to CDN only if missing
   async function loadTransformers() {
     try {
       return await import('./vendor/transformers.min.js');
@@ -157,7 +158,6 @@
 
   const { pipeline, env } = await loadTransformers();
 
-  // Enforce local model weights; block remote Hugging Face Hub calls
   env.allowLocalModels = true;
   env.allowRemoteModels = false;
   env.useBrowserCache = true;
@@ -184,9 +184,11 @@
     return new RegExp(`(?<!\\w)${escaped}(?!\\w)`, 'i');
   }
 
-  // --- CLINICAL, ONCOLOGY & DEFICIENCY DATABASE ---
+  // --- COMPREHENSIVE CLINICAL, ONCOLOGY, DEFICIENCY & DISABILITY DATABASE ---
   const clinicalDatabase = [
-    // 1. ONCOLOGY
+    // ==========================================
+    // 1. ONCOLOGY - ALL MAJOR CANCER CATEGORIES
+    // ==========================================
     {
       keywords: [
         'carcinoma', 'adenocarcinoma', 'squamous cell carcinoma', 'basal cell carcinoma',
@@ -296,7 +298,119 @@
       medSupport: "Oncology Care: Site-specific diagnostic endoscopy/imaging, molecular biomarker profiling, surgical oncology, radiation therapy, immunotherapy, and palliative symptom support."
     },
 
-    // 2. DEFICIENCIES
+    // ==========================================
+    // 2. DISABILITIES & FUNCTIONAL IMPAIRMENTS (50+ CONDITIONS)
+    // ==========================================
+    {
+      keywords: [
+        'hearing problem', 'hearing impairment', 'hearing disability', 'hard of hearing',
+        'deaf', 'deafness', 'sensorineural hearing loss', 'conductive hearing loss',
+        'auditory neuropathy', 'presbycusis', 'otosclerosis', 'cochlear implant candidate'
+      ],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Outpatient audiology and ENT evaluation for pure-tone audiometry, tympanometry, and hearing assistive devices.",
+      department: "ENT & Audiology Rehabilitation",
+      medSupport: "Auditory Care & Assistive Support: Digital hearing aids, cochlear implant evaluation, sign language/captioning accommodations, and ear protection."
+    },
+    {
+      keywords: [
+        'vision impairment', 'visual disability', 'low vision', 'blind', 'blindness',
+        'legal blindness', 'color blindness', 'color vision deficiency', 'night vision impairment',
+        'tunnel vision', 'hemianopia', 'amblyopia', 'lazy eye', 'strabismus', 'nystagmus', 'deafblindness'
+      ],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Outpatient ophthalmology and low-vision rehabilitation consultation for optical aids and functional accessibility.",
+      department: "Ophthalmology & Low-Vision Rehab",
+      medSupport: "Visual Rehabilitation: Prescription corrective optics, magnifiers, screen-reader/Braille assistive technology, orientation & mobility training, and ocular monitoring."
+    },
+    {
+      keywords: [
+        'speech impairment', 'speech disability', 'mute', 'mutism', 'selective mutism',
+        'aphasia', 'dysarthria', 'apraxia of speech', 'stuttering', 'stammering',
+        'voice disorder', 'dysphonia', 'laryngectomy speech', 'language disorder'
+      ],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Outpatient speech-language pathology (SLP) and ENT/neurology evaluation for communication therapy.",
+      department: "Speech-Language Pathology & ENT",
+      medSupport: "Communication & Speech Care: Structured speech therapy, vocal cord rehabilitation, and Augmentative and Alternative Communication (AAC) devices."
+    },
+    {
+      keywords: [
+        'physical disability', 'mobility impairment', 'paraplegia', 'quadriplegia', 'tetraplegia',
+        'hemiplegia', 'monoplegia', 'spinal cord injury', 'spina bifida', 'polio',
+        'post-polio syndrome', 'amputation', 'amputee', 'limb difference', 'congenital limb defect'
+      ],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Outpatient Physical Medicine & Rehabilitation (PM&R) consult for mobility aids, prosthetics/orthotics, and pressure-ulcer prevention.",
+      department: "Physical Medicine & Rehabilitation (PM&R)",
+      medSupport: "Mobility & Prosthetic Care: Custom wheelchair/walker fitting, prosthetic/orthotic alignment, physical & occupational therapy, and skin integrity monitoring."
+    },
+    {
+      keywords: [
+        'cerebral palsy', 'muscular dystrophy', 'duchenne muscular dystrophy', 'myasthenia gravis',
+        'als', 'amyotrophic lateral sclerosis', 'motor neuron disease', 'ataxia', 'friedreich ataxia',
+        'spasticity', 'dystonia', 'huntington disease', 'guillain barre recovery', 'charcot marie tooth'
+      ],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Multidisciplinary neurology and neuro-rehabilitation follow-up for motor function, spasticity, and respiratory/swallowing support.",
+      department: "Neuro-Rehabilitation & Neurology Clinic",
+      medSupport: "Neuromuscular Care: Targeted physical/occupational therapy, anti-spasticity management (Baclofen/Botulinum toxin), orthotic bracing, and assistive mobility equipment."
+    },
+    {
+      keywords: [
+        'autism', 'autism spectrum disorder', 'asd', 'asperger syndrome',
+        'intellectual disability', 'down syndrome', 'trisomy 21', 'fragile x syndrome',
+        'developmental delay', 'global developmental delay', 'fetal alcohol syndrome', 'rett syndrome'
+      ],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Outpatient developmental pediatrics / behavioral neurology follow-up for individualized therapy and support services.",
+      department: "Developmental Medicine & Behavioral Health",
+      medSupport: "Neurodevelopmental Support: Behavioral & occupational therapy, speech-language support, sensory integration strategies, and individualized educational/care plans."
+    },
+    {
+      keywords: [
+        'learning disability', 'dyslexia', 'dyscalculia', 'dysgraphia', 'dyspraxia',
+        'developmental coordination disorder', 'auditory processing disorder', 'sensory processing disorder',
+        'cognitive impairment', 'traumatic brain injury', 'tbi', 'post-concussion syndrome'
+      ],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Outpatient neuropsychology and occupational therapy assessment for cognitive rehabilitation and educational/workplace accommodations.",
+      department: "Neuropsychology & Occupational Therapy",
+      medSupport: "Cognitive & Learning Support: Neuropsychological testing, structured occupational therapy, assistive reading/writing tools, and tailored cognitive rehabilitation."
+    },
+    {
+      keywords: [
+        'dwarfism', 'achondroplasia', 'osteogenesis imperfecta', 'brittle bone disease',
+        'marfan syndrome', 'ehlers danlos syndrome', 'kyphosis', 'scoliosis', 'clubfoot', 'arthrogryposis'
+      ],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Outpatient orthopedic and clinical genetics follow-up for skeletal alignment, joint protection, and mobility support.",
+      department: "Orthopedics & Clinical Genetics",
+      medSupport: "Skeletal & Connective Tissue Care: Orthopedic bracing/monitoring, low-impact physical therapy, joint stability conditioning, and ergonomic mobility aids."
+    },
+    {
+      keywords: [
+        'schizophrenia', 'schizoaffective disorder', 'psychosocial disability',
+        'severe mental illness', 'dissociative disorder', 'borderline personality disorder', 'agoraphobia'
+      ],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Outpatient psychiatry and community mental health follow-up for structured therapy and medication continuity.",
+      department: "Psychiatry & Psychosocial Rehabilitation",
+      medSupport: "Psychosocial Care: Maintenance antipsychotic/mood-stabilizing therapy under psychiatrist supervision, psychotherapy, and community support programs."
+    },
+
+    // ==========================================
+    // 3. NUTRITIONAL & MICRONUTRIENT DEFICIENCIES
+    // ==========================================
     {
       keywords: ['vitamin d deficiency', 'low vitamin d', 'rickets', 'osteomalacia', 'bone softening', 'hypovitaminosis d'],
       acuity: "Level 5 - Non-Urgent / Routine",
@@ -378,7 +492,9 @@
       medSupport: "Nutritional Rehabilitation: Supervised gradual caloric and high-biological-value protein repletion, multivitamin/mineral support, and refeeding electrolyte monitoring."
     },
 
-    // 3. INFECTIOUS & TROPICAL
+    // ==========================================
+    // 4. INFECTIOUS & TROPICAL DISEASES
+    // ==========================================
     {
       keywords: ['malaria', 'plasmodium', 'chills and rigors', 'cyclical fever'],
       acuity: "Level 3 - Urgent / Priority",
@@ -460,7 +576,9 @@
       medSupport: "Ocular Care: Lubricating artificial tears, cool compresses, antibiotic eye drops (if bacterial), or antihistamine drops (if allergic)."
     },
 
-    // 4. HEPATOLOGY, NEPHROLOGY, UROLOGY & GYN
+    // ==========================================
+    // 5. HEPATOLOGY, NEPHROLOGY, UROLOGY & GYN
+    // ==========================================
     {
       keywords: ['jaundice', 'yellow eyes', 'yellow skin', 'hepatitis', 'hepatitis a', 'hepatitis b', 'hepatitis c', 'elevated bilirubin'],
       acuity: "Level 3 - Urgent / Priority",
@@ -502,7 +620,9 @@
       medSupport: "Gynecologic Care: Cycle regulation therapies, insulin-sensitizing agents (Metformin for PCOS), NSAIDs/heat therapy for dysmenorrhea, and lifestyle nutrition."
     },
 
-    // 5. HEMATOLOGY & AUTOIMMUNE
+    // ==========================================
+    // 6. HEMATOLOGY & AUTOIMMUNE
+    // ==========================================
     {
       keywords: ['anemia', 'anaemia', 'iron deficiency', 'low hemoglobin', 'pale skin', 'pallor', 'low ferritin'],
       acuity: "Level 5 - Non-Urgent / Routine",
@@ -528,7 +648,9 @@
       medSupport: "Autoimmune Care: Hydroxychloroquine, tailored immunomodulators, sun protection (UV avoidance), and regular renal/cardiovascular monitoring."
     },
 
-    // 6. ENT, OPHTHALMOLOGY & DENTAL
+    // ==========================================
+    // 7. ENT, OPHTHALMOLOGY & DENTAL
+    // ==========================================
     {
       keywords: ['ear pain', 'earache', 'otitis media', 'otitis externa', 'swimmer ear', 'ear discharge', 'blocked ear', 'ear wax'],
       acuity: "Level 5 - Non-Urgent / Routine",
@@ -538,7 +660,7 @@
       medSupport: "Otologic Care: Analgesics (Paracetamol/Ibuprofen), topical antibiotic/steroid ear drops (if outer ear), cerumen softeners, or oral antibiotics if bacterial otitis media."
     },
     {
-      keywords: ['tinnitus', 'ringing in ears', 'hearing loss', 'muffled hearing', 'meniere disease'],
+      keywords: ['tinnitus', 'ringing in ears', 'muffled hearing', 'meniere disease'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
       action: "Schedule audiometry hearing assessment and ENT evaluation.",
@@ -570,7 +692,9 @@
       medSupport: "Oral Care: Warm saline rinses, topical benzocaine/antiseptic gel for mouth ulcers, Paracetamol/Ibuprofen, and professional dental restoration."
     },
 
-    // 7. ALLERGIES & GI
+    // ==========================================
+    // 8. ALLERGIES & GI
+    // ==========================================
     {
       keywords: ['allergy', 'allergies', 'allergic', 'hay fever', 'allergic rhinitis', 'pollen allergy', 'dust allergy', 'pet dander', 'food allergy', 'skin allergy', 'contact dermatitis', 'itchy eyes', 'watery eyes', 'allergic hives', 'mild allergic rash'],
       acuity: "Level 5 - Non-Urgent / Routine",
@@ -652,7 +776,9 @@
       medSupport: "Dietary Care: Strict gluten-free diet (Celiac) or lactase enzyme supplements (Lactose intolerance), plus vitamin/mineral monitoring."
     },
 
-    // 8. DERMATOLOGY, METABOLIC, PULMONARY, CARDIO & NEURO
+    // ==========================================
+    // 9. DERMATOLOGY, METABOLIC, PULMONARY, CARDIO & NEURO
+    // ==========================================
     {
       keywords: ['hairfall', 'hair loss', 'alopecia', 'thinning hair', 'baldness', 'shedding hair', 'hair damage', 'receding hairline'],
       acuity: "Level 5 - Non-Urgent / Routine",
@@ -776,6 +902,7 @@
     'pulmonary embolism', 'deep vein thrombosis', 'dvt', 'aortic dissection', 'ectopic pregnancy',
     'testicular torsion', 'glaucoma attack', 'acute angle closure', 'heat stroke', 'hypothermia',
     'severe hypokalemia', 'severe hyponatremia', 'tetany', 'wernicke encephalopathy',
+    'autonomic dysreflexia', 'sudden hearing loss',
     'snake bite', 'snakebite', 'venom', 'venomous bite', 'poisonous bite',
     'animal bite', 'dog bite', 'rabies exposure', 'severe sting', 'multiple bee stings', 'scorpion sting', 'spider bite'
   ];
@@ -793,10 +920,10 @@
     'high blood pressure spike', 'concussion', 'tachycardia', 'severe back spasm',
     'blood in urine', 'hematuria', 'bloody stool', 'melena', 'vomiting blood', 'hematemesis',
     'cellulitis', 'dislocated joint', 'acute cholecystitis', 'severe ear infection',
-    'gallbladder pain', 'pancreatitis', 'coughing up blood', 'unexplained weight loss', 'breast lump'
+    'gallbladder pain', 'pancreatitis', 'coughing up blood', 'unexplained weight loss', 'breast lump',
+    'pressure ulcer', 'bedsore'
   ];
 
-  // Pre-compile regexes once at startup for instant matching
   const compiledCritical = criticalKeywords.map(compilePhrase);
   const compiledSevere = compilePhrase('severe');
   const compiledSevereTriggers = ['breath', 'pain', 'bleed', 'headache'].map(compilePhrase);
@@ -883,7 +1010,6 @@
     return modelLoadingPromise;
   }
 
-  // Pre-warm ./model in the background when idle so first click is faster
   const warmUp = () => {
     ensureModelLoaded().catch(() => {
       engineStatus = "Fast Local Rule Mode (./model not yet cached)";
@@ -905,7 +1031,6 @@
     const startTime = performance.now();
     const triage = evaluateTriage(text);
 
-    // 1. Render triage result immediately (never blocked by slow model load)
     renderReport(
       text,
       triage,
@@ -914,7 +1039,6 @@
       extractor ? engineStatus : "Instant Triage + Background Embedding"
     );
 
-    // 2. If model is ready, compute real embedding and update telemetry smoothly
     if (extractor) {
       try {
         const embeddings = await extractor(text, { pooling: 'mean', normalize: true });
