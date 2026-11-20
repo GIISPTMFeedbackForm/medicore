@@ -155,9 +155,12 @@
   let extractor = null;
   let modelLoadingPromise = null;
   let prototypeVectors = null;
+  let buildingProtosPromise = null;
   let lastVectorDim = 768;
   let lastSimilarity = null;
   let engineStatus = "Local Bio_ClinicalBERT Ready";
+
+  const yieldToBrowser = () => new Promise(resolve => setTimeout(resolve, 0));
 
   async function getTransformers() {
     if (transformersMod) return transformersMod;
@@ -760,13 +763,16 @@
   }
 
   async function embedText(pipe, str) {
+    await yieldToBrowser();
     const out = await pipe(str, {
       pooling: 'mean',
       normalize: true,
       truncation: true,
       max_length: 128
     });
-    return out.tolist()[0];
+    const vec = out.tolist()[0];
+    await yieldToBrowser();
+    return vec;
   }
 
   async function ensureModelLoaded() {
@@ -774,6 +780,7 @@
     if (!modelLoadingPromise) {
       modelLoadingPromise = (async () => {
         const { pipeline } = await getTransformers();
+        await yieldToBrowser();
         const pipe = await pipeline('feature-extraction', './model', { local_files_only: true });
         extractor = pipe;
         engineStatus = "Local Bio_ClinicalBERT Active (768-D, max 128 tok)";
@@ -786,24 +793,63 @@
     return modelLoadingPromise;
   }
 
-  async function ensurePrototypes(pipe) {
-    if (prototypeVectors) return prototypeVectors;
-    const built = [];
-    for (const proto of semanticPrototypes) {
-      const vec = await embedText(pipe, proto.text);
-      built.push({ label: proto.label, vector: vec, triage: proto.triage });
-    }
-    prototypeVectors = built;
-    return prototypeVectors;
+  // Build prototypes in the background yielding between every single pass so clicks are never blocked
+  function buildPrototypesInBackground(pipe) {
+    if (prototypeVectors) return Promise.resolve(prototypeVectors);
+    if (buildingProtosPromise) return buildingProtosPromise;
+
+    buildingProtosPromise = (async () => {
+      const built = [];
+      for (const proto of semanticPrototypes) {
+        await yieldToBrowser();
+        const vec = await embedText(pipe, proto.text);
+        built.push({ label: proto.label, vector: vec, triage: proto.triage });
+        await yieldToBrowser();
+      }
+      prototypeVectors = built;
+      buildingProtosPromise = null;
+      return prototypeVectors;
+    })();
+
+    return buildingProtosPromise;
   }
 
-  async function classifyWithEmbeddings(pipe, userText) {
-    const protos = await ensurePrototypes(pipe);
-    const userVec = await embedText(pipe, userText);
-    let bestProto = protos[3];
-    let bestScore = -1;
+  function matchPrototypeByTokenOverlap(userText) {
+    const words = userText.toLowerCase().match(/[a-z]{3,}/g) || [];
+    let best = semanticPrototypes[3];
+    let bestHits = -1;
+    for (const proto of semanticPrototypes) {
+      const protoWords = new Set(proto.text.toLowerCase().split(/\s+/));
+      const hits = words.filter(w => protoWords.has(w)).length;
+      if (hits > bestHits) {
+        bestHits = hits;
+        best = proto;
+      }
+    }
+    return { best, hits: bestHits };
+  }
 
-    for (const proto of protos) {
+  async function classifyWithEmbeddings(pipe, userText, reqId) {
+    const userVec = await embedText(pipe, userText);
+    if (btn.dataset.latestReq !== reqId) return null;
+
+    // If prototypes aren't built yet, return fast match immediately and build prototypes in background
+    if (!prototypeVectors) {
+      buildPrototypesInBackground(pipe);
+      const { best, hits } = matchPrototypeByTokenOverlap(userText);
+      return {
+        userVec,
+        bestScore: null,
+        triage: {
+          ...best.triage,
+          matchSource: `768-D Bio_ClinicalBERT Vector Extracted (${best.label}, lexical hits=${hits})`
+        }
+      };
+    }
+
+    let bestProto = prototypeVectors[3];
+    let bestScore = -1;
+    for (const proto of prototypeVectors) {
       const score = cosineSimilarity(userVec, proto.vector);
       if (score > bestScore) {
         bestScore = score;
@@ -843,17 +889,15 @@
       `<i>Disclaimer: AI prototype for science exhibition demonstration. Requires physician verification.</i>`;
   }
 
-  // Never disable or block the button across clicks; always process the latest input immediately
   btn.addEventListener('click', async () => {
-    btn.disabled = false;
     const text = input.value.trim();
     if (!text) {
       output.textContent = "Please enter clinical observations first.";
       return;
     }
 
-    const requestId = Date.now() + Math.random();
-    btn.dataset.latestReq = String(requestId);
+    const reqId = `${Date.now()}-${Math.random()}`;
+    btn.dataset.latestReq = reqId;
     const startTime = performance.now();
     const ruleTriage = evaluateLongSentenceRules(text);
 
@@ -879,14 +923,16 @@
 
     try {
       const pipe = await ensureModelLoaded();
-      if (btn.dataset.latestReq !== String(requestId)) return;
-      const { userVec, bestScore, triage: semanticTriage } = await classifyWithEmbeddings(pipe, text);
-      if (btn.dataset.latestReq !== String(requestId)) return;
-      lastVectorDim = userVec.length;
-      lastSimilarity = `Cosine similarity ${bestScore.toFixed(3)} (768-D)`;
-      renderReport(text, semanticTriage, Math.round(performance.now() - startTime), lastVectorDim, lastSimilarity);
+      if (btn.dataset.latestReq !== reqId) return;
+      const res = await classifyWithEmbeddings(pipe, text, reqId);
+      if (!res || btn.dataset.latestReq !== reqId) return;
+      lastVectorDim = res.userVec.length;
+      lastSimilarity = res.bestScore !== null
+        ? `Cosine similarity ${res.bestScore.toFixed(3)} (768-D)`
+        : `768-D vector ready (prototypes warming in background)`;
+      renderReport(text, res.triage, Math.round(performance.now() - startTime), lastVectorDim, lastSimilarity);
     } catch (err) {
-      if (btn.dataset.latestReq !== String(requestId)) return;
+      if (btn.dataset.latestReq !== reqId) return;
       renderReport(
         text,
         {
