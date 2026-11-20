@@ -124,7 +124,6 @@
 <body>
   <div class="card">
     <h1>MediCore Clinical Triage</h1>
-    <!-- Update your name and project details here -->
     <div class="subtitle">Designed &amp; Developed by Prabodh &bull; Science Exhibition Demo</div>
 
     <label for="symptoms">Patient Clinical Presentation / Observations:</label>
@@ -135,6 +134,8 @@
       <span class="tag-pill">Cardiac Emergency</span>
       <span class="tag-pill">Respiratory Distress</span>
       <span class="tag-pill">Neurological / Stroke</span>
+      <span class="tag-pill">Oncology &amp; Hematology</span>
+      <span class="tag-pill">Nutritional Deficiencies</span>
       <span class="tag-pill">Routine Ambulatory</span>
     </div>
 
@@ -148,7 +149,6 @@
 <script type="module">
   import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.4.0';
 
-  // Enable local models and restrict remote lookups for browser execution
   env.allowLocalModels = true;
   env.allowRemoteModels = false;
 
@@ -171,19 +171,445 @@
     return regex.test(text);
   }
 
-  // --- MASSIVELY SCALED COMPREHENSIVE CLINICAL DATABASE ---
+  // --- COMPREHENSIVE CLINICAL, ONCOLOGY & DEFICIENCY DATABASE ---
   const clinicalDatabase = [
-    // --- 1. ALLERGIES & IMMUNOLOGY ---
+    // ==========================================
+    // 1. ONCOLOGY - ALL MAJOR CANCER CATEGORIES
+    // ==========================================
+    {
+      keywords: [
+        'carcinoma', 'adenocarcinoma', 'squamous cell carcinoma', 'basal cell carcinoma',
+        'transitional cell carcinoma', 'urothelial carcinoma', 'renal cell carcinoma',
+        'hepatocellular carcinoma', 'ductal carcinoma', 'lobular carcinoma', 'merkel cell carcinoma'
+      ],
+      acuity: "Level 3 - Urgent / Priority Oncology",
+      color: "#f59e0b",
+      action: "Expedited oncology referral for biopsy pathology confirmation, TNM staging, and cross-sectional imaging.",
+      department: "Medical & Surgical Oncology",
+      medSupport: "Oncology Care Pathway: Histopathological grading, CT/PET-CT staging, multidisciplinary tumor board review, surgical resection evaluation, targeted therapy, or systemic chemotherapy."
+    },
+    {
+      keywords: [
+        'sarcoma', 'osteosarcoma', 'liposarcoma', 'leiomyosarcoma', 'chondrosarcoma',
+        'rhabdomyosarcoma', 'ewing sarcoma', 'synovial sarcoma', 'angiosarcoma',
+        'kaposi sarcoma', 'gastrointestinal stromal tumor', 'gist', 'soft tissue sarcoma'
+      ],
+      acuity: "Level 3 - Urgent / Priority Oncology",
+      color: "#f59e0b",
+      action: "Prompt referral to specialized sarcoma oncology center for MRI staging and core-needle biopsy.",
+      department: "Orthopedic & Soft Tissue Oncology",
+      medSupport: "Sarcoma Management: High-resolution MRI, bone scan/PET staging, limb-sparing surgical planning, neoadjuvant radiation therapy, and specialized chemotherapy protocols."
+    },
+    {
+      keywords: [
+        'leukemia', 'leukaemia', 'acute myeloid leukemia', 'aml', 'acute lymphoblastic leukemia', 'all',
+        'chronic lymphocytic leukemia', 'cll', 'chronic myeloid leukemia', 'cml', 'hairy cell leukemia', 'blood cancer'
+      ],
+      acuity: "Level 3 - Urgent / Priority Hematology",
+      color: "#f59e0b",
+      action: "Urgent hematology evaluation with complete blood count (CBC), peripheral smear, and bone marrow biopsy.",
+      department: "Hematology-Oncology Clinic",
+      medSupport: "Hematologic Oncology Care: Flow cytometry, cytogenetic/molecular profiling, infection prophylaxis, tyrosine kinase inhibitors (TKIs for CML), or induction chemotherapy."
+    },
+    {
+      keywords: [
+        'lymphoma', 'hodgkin lymphoma', 'hodgkin disease', 'non-hodgkin lymphoma', 'nhl',
+        'diffuse large b-cell lymphoma', 'dlbcl', 'follicular lymphoma', 'burkitt lymphoma',
+        'mantle cell lymphoma', 'cutaneous t-cell lymphoma', 'mycosis fungoides', 'swollen lymph nodes'
+      ],
+      acuity: "Level 3 - Urgent / Priority Hematology",
+      color: "#f59e0b",
+      action: "Prompt hematology-oncology evaluation for excisional lymph node biopsy and PET-CT staging.",
+      department: "Hematology-Oncology Clinic",
+      medSupport: "Lymphoma Care: Excisional biopsy, immunophenotyping, PET-CT staging, chemoimmunotherapy regimens (e.g., R-CHOP or ABVD), and radiation therapy."
+    },
+    {
+      keywords: [
+        'myeloma', 'multiple myeloma', 'plasma cell myeloma', 'plasmacytoma',
+        'waldenstrom macroglobulinemia', 'monoclonal gammopathy', 'mgus', 'bone marrow cancer'
+      ],
+      acuity: "Level 3 - Urgent / Priority Hematology",
+      color: "#f59e0b",
+      action: "Prompt hematology consult for serum protein electrophoresis (SPEP), free light chains, and skeletal survey.",
+      department: "Hematology-Oncology Clinic",
+      medSupport: "Plasma Cell Care: Proteasome inhibitors, immunomodulatory agents, monoclonal antibodies, bisphosphonates for bone protection, and renal function monitoring."
+    },
+    {
+      keywords: [
+        'brain tumor', 'brain cancer', 'glioblastoma', 'gbm', 'astrocytoma', 'meningioma',
+        'medulloblastoma', 'oligodendroglioma', 'ependymoma', 'glioma', 'spinal cord tumor', 'cns tumor'
+      ],
+      acuity: "Level 3 - Urgent / Priority Neuro-Oncology",
+      color: "#f59e0b",
+      action: "Urgent neuro-oncology and neurosurgery evaluation with contrast-enhanced brain/spine MRI.",
+      department: "Neuro-Oncology & Neurosurgery",
+      medSupport: "CNS Tumor Care: Contrast MRI, corticosteroid edema control if symptomatic, stereotactic biopsy/resection, radiation therapy, and temozolomide-based protocols."
+    },
+    {
+      keywords: [
+        'melanoma', 'malignant melanoma', 'skin cancer', 'ocular melanoma', 'uveal melanoma',
+        'acral lentiginous melanoma', 'nodular melanoma', 'changing mole', 'asymmetrical mole'
+      ],
+      acuity: "Level 3 - Urgent / Priority Oncology",
+      color: "#f59e0b",
+      action: "Expedited dermatology/surgical oncology evaluation for dermoscopy and full-thickness excisional biopsy.",
+      department: "Dermatologic & Surgical Oncology",
+      medSupport: "Melanoma Care: Breslow depth measurement, sentinel lymph node biopsy, BRAF/MEK mutation testing, immunotherapy (checkpoint inhibitors), and wide local excision."
+    },
+    {
+      keywords: [
+        'neuroendocrine tumor', 'net', 'carcinoid tumor', 'carcinoid syndrome',
+        'pheochromocytoma', 'paraganglioma', 'insulinoma', 'gastrinoma', 'neuroblastoma', 'retinoblastoma'
+      ],
+      acuity: "Level 3 - Urgent / Priority Oncology",
+      color: "#f59e0b",
+      action: "Prompt endocrinology and oncology evaluation for biochemical hormone markers and Gallium-68 DOTATATE PET scan.",
+      department: "Endocrine & Medical Oncology",
+      medSupport: "Neuroendocrine Care: Somatostatin analogs (Octreotide/Lanreotide), peptide receptor radionuclide therapy (PRRT), hormone blockade, and surgical debulking."
+    },
+    {
+      keywords: [
+        'breast cancer', 'lung cancer', 'non-small cell lung cancer', 'nsclc', 'small cell lung cancer', 'sclc',
+        'mesothelioma', 'colon cancer', 'colorectal cancer', 'rectal cancer', 'prostate cancer',
+        'stomach cancer', 'gastric cancer', 'esophageal cancer', 'pancreatic cancer', 'liver cancer',
+        'gallbladder cancer', 'bile duct cancer', 'cholangiocarcinoma', 'cervical cancer',
+        'ovarian cancer', 'endometrial cancer', 'uterine cancer', 'vulvar cancer', 'vaginal cancer',
+        'bladder cancer', 'kidney cancer', 'renal cancer', 'testicular cancer', 'penile cancer',
+        'thyroid cancer', 'oral cancer', 'mouth cancer', 'throat cancer', 'laryngeal cancer',
+        'nasopharyngeal cancer', 'salivary gland cancer', 'bone cancer', 'cancer', 'malignancy', 'tumor'
+      ],
+      acuity: "Level 3 - Urgent / Priority Oncology",
+      color: "#f59e0b",
+      action: "Prompt specialist oncology referral for diagnostic imaging, tissue biopsy, and biomarker testing.",
+      department: "Comprehensive Oncology Clinic",
+      medSupport: "Oncology Care: Site-specific diagnostic endoscopy/imaging, molecular biomarker profiling, surgical oncology, radiation therapy, immunotherapy, and palliative symptom support."
+    },
+
+    // ==========================================
+    // 2. NUTRITIONAL & MICRONUTRIENT DEFICIENCIES
+    // ==========================================
+    {
+      keywords: [
+        'vitamin d deficiency', 'low vitamin d', 'rickets', 'osteomalacia', 'bone softening', 'hypovitaminosis d'
+      ],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Schedule serum 25-hydroxyvitamin D blood test; manage with physician-guided supplementation and safe sunlight exposure.",
+      department: "Primary Care / Endocrinology",
+      medSupport: "Vitamin D Care: Cholecalciferol (Vitamin D3) loading/maintenance therapy, dietary fortified foods, calcium co-supplementation, and safe sun exposure."
+    },
+    {
+      keywords: [
+        'vitamin b12 deficiency', 'low vitamin b12', 'cobalamin deficiency', 'pernicious anemia',
+        'folate deficiency', 'folic acid deficiency', 'vitamin b9 deficiency', 'megaloblastic anemia'
+      ],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Schedule serum Vitamin B12, folate, and CBC panels to prevent neurological progression.",
+      department: "Primary Care / Hematology",
+      medSupport: "B12 & Folate Care: Methylcobalamin or Cyanocobalamin (oral or intramuscular injections if malabsorption/neurological signs), folic acid tablets, and fortified nutrition."
+    },
+    {
+      keywords: [
+        'vitamin a deficiency', 'night blindness', 'nyctalopia', 'xerophthalmia', 'bitot spots'
+      ],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Outpatient ophthalmology and nutrition evaluation for targeted Vitamin A repletion.",
+      department: "Primary Care / Ophthalmology",
+      medSupport: "Vitamin A Care: Physician-dosed retinyl palmitate supplementation, beta-carotene-rich foods (carrots, leafy greens, sweet potatoes), and lubricating eye drops."
+    },
+    {
+      keywords: [
+        'vitamin c deficiency', 'scurvy', 'ascorbic acid deficiency', 'bleeding gums from deficiency', 'poor wound healing'
+      ],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Manage with oral Vitamin C supplementation and citrus/fresh produce dietary intake.",
+      department: "Primary Care / Clinical Nutrition",
+      medSupport: "Vitamin C Care: Oral ascorbic acid tablets (500-1000 mg/day initially per physician), citrus fruits, bell peppers, and leafy greens."
+    },
+    {
+      keywords: [
+        'vitamin b1 deficiency', 'thiamine deficiency', 'beriberi', 'vitamin b2 deficiency', 'riboflavin deficiency',
+        'vitamin b3 deficiency', 'niacin deficiency', 'pellagra', 'vitamin b6 deficiency', 'pyridoxine deficiency',
+        'vitamin b complex deficiency', 'angular cheilitis', 'glossitis'
+      ],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Outpatient nutritional evaluation and B-complex micronutrient replenishment.",
+      department: "Primary Care / Internal Medicine",
+      medSupport: "B-Complex Care: Therapeutic Vitamin B-complex supplementation (Thiamine, Riboflavin, Niacinamide, Pyridoxine) and balanced whole-grain/protein diet."
+    },
+    {
+      keywords: [
+        'vitamin k deficiency', 'vitamin e deficiency', 'tocopherol deficiency', 'fat soluble vitamin deficiency'
+      ],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Outpatient coagulation profile (PT/INR) and lipid/malabsorption screening.",
+      department: "Internal Medicine / Hematology",
+      medSupport: "Fat-Soluble Vitamin Care: Phytonadione (Vitamin K1) or Vitamin E supplementation under medical supervision and evaluation for fat malabsorption."
+    },
+    {
+      keywords: [
+        'calcium deficiency', 'hypocalcemia', 'low calcium', 'muscle cramps from deficiency', 'brittle nails', 'osteopenia'
+      ],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Schedule serum calcium, albumin, parathyroid hormone (PTH), and Vitamin D levels.",
+      department: "Primary Care / Endocrinology",
+      medSupport: "Calcium & Bone Care: Calcium citrate or carbonate with Vitamin D3, dairy/fortified plant milks, leafy greens, and weight-bearing exercise."
+    },
+    {
+      keywords: [
+        'magnesium deficiency', 'hypomagnesemia', 'low magnesium', 'potassium deficiency', 'hypokalemia',
+        'low potassium', 'electrolyte imbalance', 'sodium deficiency', 'hyponatremia', 'low sodium'
+      ],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Schedule basic metabolic panel (BMP) to check serum electrolytes and renal handling.",
+      department: "Primary Care / Internal Medicine",
+      medSupport: "Electrolyte Care: Oral magnesium glycinate/oxide, potassium-rich foods or prescribed potassium chloride, oral rehydration salts, and medication review."
+    },
+    {
+      keywords: [
+        'zinc deficiency', 'low zinc', 'iodine deficiency', 'iodine deficiency goiter',
+        'selenium deficiency', 'copper deficiency', 'mineral deficiency', 'micronutrient deficiency'
+      ],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Outpatient trace-element and thyroid screening with targeted dietary/supplement correction.",
+      department: "Primary Care / Clinical Nutrition",
+      medSupport: "Trace Mineral Care: Zinc sulfate/gluconate, iodized salt (for iodine deficiency), nuts/seeds/legumes, and balanced micronutrient supplementation."
+    },
+    {
+      keywords: [
+        'protein deficiency', 'malnutrition', 'protein energy malnutrition', 'kwashiorkor',
+        'marasmus', 'hypoalbuminemia', 'nutritional deficiency', 'underweight', 'cachexia'
+      ],
+      acuity: "Level 3 - Urgent / Priority Nutrition",
+      color: "#f59e0b",
+      action: "Prompt medical and clinical dietitian assessment for gradual refeeding, albumin/electrolyte monitoring, and underlying cause evaluation.",
+      department: "Internal Medicine & Clinical Nutrition",
+      medSupport: "Nutritional Rehabilitation: Supervised gradual caloric and high-biological-value protein repletion, multivitamin/mineral support, and refeeding electrolyte monitoring."
+    },
+
+    // ==========================================
+    // 3. INFECTIOUS & TROPICAL DISEASES
+    // ==========================================
+    {
+      keywords: ['malaria', 'plasmodium', 'chills and rigors', 'cyclical fever'],
+      acuity: "Level 3 - Urgent / Priority",
+      color: "#f59e0b",
+      action: "Prompt blood smear / rapid diagnostic antigen test (RDT) and physician evaluation.",
+      department: "Infectious Disease / Urgent Care",
+      medSupport: "Antimalarial Care: Artemisinin-based combination therapy (ACT) or Chloroquine (species-dependent), antipyretics, and fluid monitoring."
+    },
+    {
+      keywords: ['dengue', 'dengue fever', 'breakbone fever', 'low platelets', 'thrombocytopenia'],
+      acuity: "Level 3 - Urgent / Priority",
+      color: "#f59e0b",
+      action: "Urgent NS1 antigen/IgM testing and serial platelet/hematocrit monitoring. Avoid NSAIDs/Aspirin.",
+      department: "Urgent Care / Internal Medicine",
+      medSupport: "Dengue Supportive Care: Strict oral/IV hydration, Paracetamol ONLY for fever (avoid Ibuprofen/Aspirin due to bleeding risk), and daily CBC monitoring."
+    },
+    {
+      keywords: ['typhoid', 'enteric fever', 'salmonella typhi', 'step-ladder fever'],
+      acuity: "Level 3 - Urgent / Priority",
+      color: "#f59e0b",
+      action: "Clinical evaluation for blood culture/serology and targeted antibiotic course.",
+      department: "Internal Medicine / Infectious Disease",
+      medSupport: "Typhoid Care: Targeted antibiotics (Azithromycin or Ceftriaxone per sensitivity), hydration, soft digestible diet, and fever control."
+    },
+    {
+      keywords: ['chikungunya', 'viral polyarthralgia', 'mosquito fever'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Manage with rest, aggressive hydration, and physician-guided joint pain relief.",
+      department: "Primary Care / Internal Medicine",
+      medSupport: "Viral Joint Care: Paracetamol for fever/pain, adequate fluid intake, rest, and gentle joint mobilization after acute fever subsides."
+    },
+    {
+      keywords: ['tuberculosis', 'tb', 'pulmonary tb', 'night sweats', 'chronic cough with weight loss', 'hemoptysis'],
+      acuity: "Level 3 - Urgent / Priority",
+      color: "#f59e0b",
+      action: "Prompt respiratory isolation precaution, chest X-ray, and sputum AFB / GeneXpert testing.",
+      department: "Pulmonology / Infectious Disease",
+      medSupport: "Anti-Tubercular Therapy (ATT): Supervised multi-drug regimen (Rifampicin, Isoniazid, Pyrazinamide, Ethambutol), liver function monitoring, and nutritional support."
+    },
+    {
+      keywords: ['covid', 'covid-19', 'coronavirus', 'sars-cov-2', 'loss of taste', 'loss of smell', 'anosmia'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Isolate, monitor oxygen saturation (SpO2) with pulse oximeter, rest, and hydrate.",
+      department: "Primary Care / Telehealth",
+      medSupport: "Viral Respiratory Care: Pulse oximetry monitoring (seek urgent care if SpO2 drops below 94%), Paracetamol, hydration, and antiviral evaluation if high-risk."
+    },
+    {
+      keywords: ['chickenpox', 'varicella', 'shingles', 'herpes zoster', 'blistering rash'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Isolate until lesions crust over; consult physician early for antiviral therapy.",
+      department: "Primary Care / Dermatology",
+      medSupport: "Varicella-Zoster Care: Oral Acyclovir/Valacyclovir (most effective within 72 hours), calamine lotion, antihistamines for itching, and Paracetamol."
+    },
+    {
+      keywords: ['uti', 'urinary tract infection', 'burning urination', 'dysuria', 'painful urination', 'frequent urination', 'cystitis'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Schedule urinalysis and urine culture for targeted antibiotic therapy; increase water intake.",
+      department: "Primary Care / Urology",
+      medSupport: "Urologic Care: Targeted antibiotics (Nitrofurantoin or Fosfomycin per culture), urinary alkalinizers, phenazopyridine for discomfort, and high fluid intake."
+    },
+    {
+      keywords: ['ringworm', 'tinea', 'fungal infection', 'athlete foot', 'jock itch', 'candidiasis', 'yeast infection'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Keep affected skin clean and dry; treat with topical antifungal agents.",
+      department: "Primary Care / Dermatology",
+      medSupport: "Antifungal Care: Topical Clotrimazole, Terbinafine, or Miconazole applied for 2-4 weeks, breathable cotton clothing, and moisture control."
+    },
+    {
+      keywords: ['conjunctivitis', 'pink eye', 'red eye', 'eye discharge', 'sticky eyes'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Practice strict hand hygiene, avoid eye rubbing/contact lenses, and seek outpatient evaluation.",
+      department: "Primary Care / Ophthalmology",
+      medSupport: "Ocular Care: Lubricating artificial tears, cool compresses, antibiotic eye drops (if bacterial), or antihistamine drops (if allergic)."
+    },
+
+    // ==========================================
+    // 4. HEPATOLOGY, NEPHROLOGY & UROLOGY
+    // ==========================================
+    {
+      keywords: ['jaundice', 'yellow eyes', 'yellow skin', 'hepatitis', 'hepatitis a', 'hepatitis b', 'hepatitis c', 'elevated bilirubin'],
+      acuity: "Level 3 - Urgent / Priority",
+      color: "#f59e0b",
+      action: "Prompt liver function panel (LFTs), viral hepatitis serology, and abdominal ultrasound.",
+      department: "Gastroenterology & Hepatology",
+      medSupport: "Hepatology Care: Avoid alcohol and hepatotoxic drugs (including excess Paracetamol), hydration, low-fat diet, and targeted antiviral therapy if chronic Hep B/C."
+    },
+    {
+      keywords: ['fatty liver', 'nafld', 'mash', 'cirrhosis', 'liver fibrosis', 'ascites'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Outpatient hepatology follow-up, liver elastography (FibroScan), and metabolic risk management.",
+      department: "Hepatology / Internal Medicine",
+      medSupport: "Liver Health Care: Gradual weight loss, Mediterranean diet, strict alcohol abstinence, diabetes/lipid control, and periodic ultrasound surveillance."
+    },
+    {
+      keywords: ['chronic kidney disease', 'ckd', 'renal insufficiency', 'high creatinine', 'proteinuria', 'nephrotic syndrome', 'nephritis'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Outpatient nephrology monitoring of eGFR, urine albumin-to-creatinine ratio, and blood pressure.",
+      department: "Nephrology Clinic",
+      medSupport: "Renal Protective Care: Blood pressure control (ACE inhibitors/ARBs), SGLT2 inhibitors if indicated, sodium/protein moderation, and avoiding NSAIDs."
+    },
+    {
+      keywords: ['bph', 'benign prostatic hyperplasia', 'enlarged prostate', 'weak urine stream', 'nocturia', 'prostatitis'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Outpatient urology evaluation including PSA check, post-void residual ultrasound, and urinalysis.",
+      department: "Urology Outpatient Clinic",
+      medSupport: "Prostate Care: Alpha-blockers (Tamsulosin), 5-alpha reductase inhibitors (Finasteride), timed voiding, and limiting evening caffeine/fluids."
+    },
+    {
+      keywords: ['pcos', 'pcod', 'polycystic ovary syndrome', 'irregular periods', 'amenorrhea', 'dysmenorrhea', 'menstrual cramps', 'endometriosis', 'fibroids'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Outpatient gynecology evaluation for pelvic ultrasound and hormonal panel.",
+      department: "Gynecology & Women's Health",
+      medSupport: "Gynecologic Care: Cycle regulation therapies, insulin-sensitizing agents (Metformin for PCOS), NSAIDs/heat therapy for dysmenorrhea, and lifestyle nutrition."
+    },
+
+    // ==========================================
+    // 5. HEMATOLOGY & AUTOIMMUNE DISORDERS
+    // ==========================================
+    {
+      keywords: ['anemia', 'anaemia', 'iron deficiency', 'low hemoglobin', 'pale skin', 'pallor', 'low ferritin'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Schedule CBC, serum ferritin, iron studies, and Vitamin B12/folate panel to determine underlying cause.",
+      department: "Primary Care / Hematology",
+      medSupport: "Hematologic Care: Oral iron supplementation (Ferrous Sulfate with Vitamin C), Vitamin B12/folate if indicated, and iron-rich diet."
+    },
+    {
+      keywords: ['sickle cell', 'thalassemia', 'hemophilia', 'bleeding disorder', 'easy bruising', 'itp'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Specialized hematology outpatient management, genetic counseling, and preventative vaccination.",
+      department: "Hematology Clinic",
+      medSupport: "Inherited/Chronic Blood Care: Folic acid supplementation, Hydroxyurea (for sickle cell), hydration, and avoiding trauma or antiplatelet medications."
+    },
+    {
+      keywords: ['lupus', 'sle', 'systemic lupus erythematosus', 'sjogren', 'scleroderma', 'vasculitis', 'autoimmune disease', 'butterfly rash'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Outpatient rheumatology consultation for ANA/autoantibody profile, complement levels, and organ screening.",
+      department: "Rheumatology & Immunology",
+      medSupport: "Autoimmune Care: Hydroxychloroquine, tailored immunomodulators, sun protection (UV avoidance), and regular renal/cardiovascular monitoring."
+    },
+
+    // ==========================================
+    // 6. ENT, OPHTHALMOLOGY & DENTAL
+    // ==========================================
+    {
+      keywords: ['ear pain', 'earache', 'otitis media', 'otitis externa', 'swimmer ear', 'ear discharge', 'blocked ear', 'ear wax'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Outpatient otoscopy examination; keep ear canal dry and avoid cotton swabs.",
+      department: "ENT / Primary Care Clinic",
+      medSupport: "Otologic Care: Analgesics (Paracetamol/Ibuprofen), topical antibiotic/steroid ear drops (if outer ear), cerumen softeners, or oral antibiotics if bacterial otitis media."
+    },
+    {
+      keywords: ['tinnitus', 'ringing in ears', 'hearing loss', 'muffled hearing', 'meniere disease'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Schedule audiometry hearing assessment and ENT evaluation.",
+      department: "ENT & Audiology",
+      medSupport: "Audiologic Care: Pure-tone audiometry, noise protection, sound therapy masking, and low-sodium diet if Meniere's suspected."
+    },
+    {
+      keywords: ['nosebleed', 'epistaxis', 'bleeding nose'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Sit upright, lean slightly forward, and pinch soft part of nose continuously for 10-15 minutes. Seek urgent care if bleeding continues over 20 minutes.",
+      department: "Primary Care / ENT",
+      medSupport: "First Aid & Nasal Care: Direct nasal compression, cold compress on bridge of nose, saline nasal gel, and humidifier use."
+    },
+    {
+      keywords: ['cataract', 'glaucoma', 'dry eyes', 'eye strain', 'macular degeneration', 'diabetic retinopathy', 'blurry near vision'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Schedule comprehensive dilated eye exam and intraocular pressure (tonometry) check.",
+      department: "Ophthalmology Clinic",
+      medSupport: "Ophthalmic Care: Preservative-free lubricating drops, intraocular pressure-lowering drops (for glaucoma), UV-blocking eyewear, and annual retinal screening."
+    },
+    {
+      keywords: ['toothache', 'dental pain', 'cavity', 'gingivitis', 'bleeding gums', 'wisdom tooth', 'mouth ulcer', 'canker sore'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Schedule outpatient dental evaluation; maintain warm saltwater rinses.",
+      department: "Dental & Oral Medicine",
+      medSupport: "Oral Care: Warm saline rinses, topical benzocaine/antiseptic gel for mouth ulcers, Paracetamol/Ibuprofen, and professional dental restoration."
+    },
+
+    // ==========================================
+    // 7. ALLERGIES & IMMUNOLOGY
+    // ==========================================
     {
       keywords: ['allergy', 'allergies', 'allergic', 'hay fever', 'allergic rhinitis', 'pollen allergy', 'dust allergy', 'pet dander', 'food allergy', 'skin allergy', 'contact dermatitis', 'itchy eyes', 'watery eyes', 'allergic hives', 'mild allergic rash'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
       action: "Manage with allergen avoidance, oral antihistamines, and nasal sprays.",
       department: "Primary Care / Allergy Outpatient Clinic",
-      medSupport: "Allergy Management: Non-drowsy second-generation antihistamines (Cetirizine, Loratadine, Fexofenadine), intranasal corticosteroids (Fluticasone), saline nasal rinses, and topical hydrocortisone for mild skin itching."
+      medSupport: "Allergy Management: Non-drowsy second-generation antihistamines (Cetirizine, Loratadine, Fexofenadine), intranasal corticosteroids (Fluticasone), saline nasal rinses, and topical hydrocortisone."
     },
 
-    // --- 2. GASTROINTESTINAL & STOMACH CONDITIONS ---
+    // ==========================================
+    // 8. GASTROINTESTINAL & STOMACH CONDITIONS
+    // ==========================================
     {
       keywords: ['stomach pain', 'stomach ache', 'abdominal pain', 'belly ache', 'stomach cramp', 'gastric pain'],
       acuity: "Level 5 - Non-Urgent / Routine",
@@ -198,7 +624,7 @@
       color: "#38bdf8",
       action: "Manage with dietary adjustments, simethicone, and gentle physical activity.",
       department: "Primary Care / Home Care",
-      medSupport: "Digestive Support: Simethicone for gas relief, activated charcoal, peppermint oil capsules, herbal teas (ginger/peppermint), and reducing carbonated beverages."
+      medSupport: "Digestive Support: Simethicone for gas relief, activated charcoal, peppermint oil capsules, herbal teas, and reducing carbonated beverages."
     },
     {
       keywords: ['indigestion', 'dyspepsia', 'sour stomach', 'heavy stomach', 'postprandial fullness'],
@@ -217,190 +643,160 @@
       medSupport: "Gastrointestinal Care: Proton pump inhibitors (PPIs like Omeprazole) or H2 blockers, elevating the head of the bed, and avoiding lying down after eating."
     },
     {
-      keywords: ['gastritis', 'stomach inflammation', 'lining irritation'],
+      keywords: ['gastritis', 'stomach inflammation', 'lining irritation', 'peptic ulcer', 'stomach ulcer', 'duodenal ulcer', 'ulcer pain'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
-      action: "Manage with mucosal protective agents, bland diet, and avoiding NSAIDs or alcohol.",
-      department: "Primary Care Outpatient Clinic",
-      medSupport: "Gastric Care: Sucralfate, PPIs, anti-acids, elimination of spicy/acidic foods, and avoiding prolonged ibuprofen use."
-    },
-    {
-      keywords: ['peptic ulcer', 'stomach ulcer', 'duodenal ulcer', 'ulcer pain'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Outpatient clinical evaluation for H. pylori testing and targeted pharmaceutical therapy.",
+      action: "Outpatient clinical evaluation for H. pylori testing, mucosal protectants, and avoiding NSAIDs.",
       department: "Gastroenterology / Primary Care",
-      medSupport: "Ulcer Management: Antibiotic regimen (if H. pylori positive), high-dose PPI therapy, and mucosal protectants under physician supervision."
+      medSupport: "Gastric & Ulcer Care: PPI therapy, Sucralfate, H. pylori eradication regimen (if positive), and eliminating spicy/acidic foods."
     },
     {
-      keywords: ['ibs', 'irritable bowel syndrome', 'spastic colon', 'functional bowel disorder'],
+      keywords: ['ibs', 'irritable bowel syndrome', 'spastic colon', 'functional bowel disorder', 'crohn disease', 'ulcerative colitis', 'ibd'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
-      action: "Manage with dietary triggers identification (FODMAPs), stress management, and fiber.",
-      department: "Gastroenterology / Primary Care",
-      medSupport: "IBS Management: Soluble fiber supplements (psyllium), antispasmodics (Hyoscine), peppermint oil, and low-FODMAP dietary tracking."
+      action: "Outpatient gastroenterology management with dietary trigger tracking and targeted therapy.",
+      department: "Gastroenterology Clinic",
+      medSupport: "Bowel Management: Soluble fiber (psyllium), antispasmodics, low-FODMAP guidance (IBS), or anti-inflammatory mesalamine/biologics (IBD)."
     },
     {
-      keywords: ['constipation', 'hard stool', 'infrequent bowel movements', 'difficulty passing stool'],
+      keywords: ['constipation', 'hard stool', 'infrequent bowel movements', 'difficulty passing stool', 'hemorrhoids', 'piles', 'anal fissure'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
-      action: "Manage with increased water intake, dietary fiber, and mild osmotic laxatives.",
+      action: "Manage with increased water intake, dietary fiber, sitz baths, and mild osmotic laxatives.",
+      department: "Primary Care / Proctology",
+      medSupport: "Bowel & Anorectal Care: Polyethylene glycol (MiraLAX), psyllium fiber, warm sitz baths, topical soothing ointments, and hydration."
+    },
+    {
+      keywords: ['diarrhea', 'diarrhoea', 'loose stools', 'watery stools', 'stomach bug', 'gastroenteritis', 'stomach flu', 'food poisoning', 'nausea', 'queasiness'],
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Focus on oral rehydration solutions (ORS) and electrolyte balance. Seek care if lasting over 48 hours.",
       department: "Primary Care / Home Care",
-      medSupport: "Bowel Care: Polyethylene glycol (MiraLAX), psyllium husk fiber, prune juice, increased hydration, and physical activity."
+      medSupport: "Rehydration Support: Oral rehydration salts (ORS), probiotics, ginger tea, bland BRAT diet, and small frequent sips of clear fluids."
     },
     {
-      keywords: ['diarrhea', 'diarrhoea', 'loose stools', 'watery stools', 'stomach bug'],
+      keywords: ['celiac disease', 'gluten intolerance', 'gluten sensitivity', 'lactose intolerance'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
-      action: "Focus on oral rehydration solutions (ORS) and electrolyte balance. Consult care if lasting over 48 hours.",
-      department: "Primary Care / Home Care",
-      medSupport: "Rehydration Support: Oral rehydration salts (ORS), loperamide (if non-infectious), probiotics, and bland BRAT diet (bananas, rice, applesauce, toast)."
-    },
-    {
-      keywords: ['gastroenteritis', 'stomach flu', 'stomach infection', 'stomach bug infection'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Rest, hydration with electrolyte solutions, and gradual reintroduction of bland foods.",
-      department: "Primary Care Clinic / Urgent Care",
-      medSupport: "Supportive Care: Electrolyte solutions, anti-nausea medications (if prescribed), rest, and frequent small sips of water."
-    },
-    {
-      keywords: ['nausea', 'queasiness', 'sick to stomach', 'urge to vomit'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Manage with ginger tea, clear fluids, rest, and avoiding strong odors or greasy foods.",
-      department: "Primary Care / Home Care",
-      medSupport: "Anti-nausea Care: Ginger root extract, dimenhydrinate or meclizine (motion/nausea relief), and clear liquid hydration."
-    },
-    {
-      keywords: ['celiac disease', 'gluten intolerance', 'gluten sensitivity'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Long-term dietary management with strict lifelong gluten avoidance and nutritional monitoring.",
+      action: "Long-term dietary management with trigger avoidance and nutritional monitoring.",
       department: "Gastroenterology / Outpatient Nutrition",
-      medSupport: "Dietary Care: Strict gluten-free diet adherence, vitamin/mineral supplementation (iron, calcium, vitamin D), and mucosal healing follow-up."
+      medSupport: "Dietary Care: Strict gluten-free diet (Celiac) or lactase enzyme supplements (Lactose intolerance), plus vitamin/mineral monitoring."
     },
 
-    // --- 3. WELLNESS, HAIR & DERMATOLOGY ---
+    // ==========================================
+    // 9. WELLNESS, HAIR & DERMATOLOGY
+    // ==========================================
     {
       keywords: ['hairfall', 'hair loss', 'alopecia', 'thinning hair', 'baldness', 'shedding hair', 'hair damage', 'receding hairline'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
       action: "Manage with nutritional tracking, gentle hair care routines, and dermatologist evaluation if persistent.",
       department: "Dermatology / Routine Outpatient Care",
-      medSupport: "Dermatological & Nutritional Care: Biotin, iron/ferritin level screening, scalp care, minoxidil topical solutions (under medical advice), and balanced protein intake."
+      medSupport: "Dermatological & Nutritional Care: Iron/ferritin, Vitamin D/B12, and thyroid screening, scalp care, minoxidil topical solutions (under medical advice), and balanced protein intake."
     },
     {
-      keywords: ['dry skin', 'skin dryness', 'dryness', 'flaky skin', 'chapped skin', 'rough skin', 'scaling skin', 'peeling skin'],
+      keywords: ['dry skin', 'skin dryness', 'dryness', 'flaky skin', 'chapped skin', 'rough skin', 'scaling skin', 'peeling skin', 'dandruff', 'flaky scalp', 'itchy scalp', 'seborrheic dermatitis'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
-      action: "Manage at home with barrier repair moisturizers, adequate hydration, and mild cleansers.",
+      action: "Manage at home with barrier repair moisturizers, medicated shampoos, and adequate hydration.",
       department: "Primary Care / Dermatology Care",
-      medSupport: "Dermatological Care: Daily application of ceramide-rich moisturizers, gentle fragrance-free cleansers, petroleum jelly for extreme patches, and increased water consumption."
+      medSupport: "Dermatological Care: Ceramide-rich moisturizers, gentle fragrance-free cleansers, and ketoconazole or zinc pyrithione shampoo for scalp flaking."
     },
     {
-      keywords: ['dandruff', 'flaky scalp', 'itchy scalp', 'scalp flaking', 'seborrheic dermatitis'],
+      keywords: ['eczema', 'psoriasis', 'dermatitis', 'rash', 'acne', 'rosacea', 'hives', 'urticaria', 'vitiligo', 'scabies'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
-      action: "Manage at home with medicated shampoos and scalp care routines.",
-      department: "Dermatology / Home Care",
-      medSupport: "Scalp Care: Anti-dandruff shampoos containing ketoconazole, zinc pyrithione, or selenium sulfide, and gentle washing frequency."
+      action: "Outpatient dermatology evaluation and skin barrier maintenance.",
+      department: "Dermatology Clinic",
+      medSupport: "Dermatological Care: Topical emollients, prescribed topical corticosteroids or retinoids/benzoyl peroxide (for acne), and gentle cleansers."
     },
     {
-      keywords: ['fatigue', 'tiredness', 'malaise', 'exhaustion', 'low energy', 'weakness', 'lethargy', 'chronic fatigue'],
+      keywords: ['fatigue', 'tiredness', 'malaise', 'exhaustion', 'low energy', 'weakness', 'lethargy', 'chronic fatigue', 'dehydration', 'heat exhaustion'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
-      action: "Evaluate sleep habits, balanced nutrition, and schedule routine blood panels.",
+      action: "Cool rest, oral rehydration, sleep hygiene review, and routine blood panels.",
       department: "Primary Care Outpatient Clinic",
-      medSupport: "Systemic Screening: Complete blood count (CBC), iron panel, thyroid stimulating hormone (TSH), vitamin D/B12 checks, sleep hygiene optimization, and balanced nutrition."
+      medSupport: "Systemic Screening: CBC, iron panel, TSH, vitamin D/B12 checks, electrolyte replenishment, and sleep optimization."
     },
 
-    // --- 4. METABOLIC & ENDOCRINE ---
+    // ==========================================
+    // 10. METABOLIC, ENDOCRINE, MUSCULOSKELETAL & PULMONARY
+    // ==========================================
     {
-      keywords: ['diabetes', 'diabeties', 'diabetic', 'blood sugar', 'hyperglycemia', 'hypoglycemia', 'insulin', 'type 1 diabetes', 'type 2 diabetes', 'insulin resistance'],
+      keywords: ['diabetes', 'diabeties', 'diabetic', 'blood sugar', 'hyperglycemia', 'hypoglycemia', 'insulin', 'type 1 diabetes', 'type 2 diabetes', 'insulin resistance', 'prediabetes'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
-      action: "Manage at home with rest, lifestyle modifications, and scheduled outpatient monitoring.",
-      department: "Primary Care Clinic / Specialized Outpatient Care",
-      medSupport: "Chronic Metabolic Care: Regular blood glucose monitoring, HbA1c tracking, carbohydrate-controlled diet, hydration, and adherence to prescribed oral hypoglycemics (e.g., Metformin) or Insulin under endocrinologist supervision."
+      action: "Scheduled outpatient endocrinology monitoring, HbA1c tracking, and lifestyle management.",
+      department: "Endocrinology / Primary Care Clinic",
+      medSupport: "Chronic Metabolic Care: Regular blood glucose logging, HbA1c every 3 months, carbohydrate-controlled nutrition, and prescribed Metformin or Insulin."
     },
     {
-      keywords: ['hypothyroid', 'hyperthyroid', 'thyroid', 'hashimoto', 'graves disease', 'cushing', 'addison', 'goiter'],
+      keywords: ['hypothyroid', 'hyperthyroid', 'thyroid', 'hashimoto', 'graves disease', 'cushing', 'addison', 'goiter', 'high cholesterol', 'hyperlipidemia', 'dyslipidemia'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
-      action: "Manage at home with rest, lifestyle modifications, and scheduled outpatient monitoring.",
-      department: "Primary Care Clinic / Specialized Outpatient Care",
-      medSupport: "Endocrine Management: Scheduled hormone replacement therapy (e.g., Levothyroxine) or anti-thyroid agents, monitored periodically via serum TSH and free T4 blood panels."
+      action: "Scheduled outpatient hormone/lipid monitoring and medication adherence.",
+      department: "Endocrinology / Internal Medicine",
+      medSupport: "Endocrine & Lipid Care: Levothyroxine or anti-thyroid therapy (monitored via TSH/T4), or statins/heart-healthy diet for dyslipidemia."
     },
-
-    // --- 5. MUSCULOSKELETAL & RHEUMATOLOGY ---
     {
-      keywords: ['arthritis', 'arthiritis', 'osteoarthritis', 'rheumatoid', 'joint pain', 'gout', 'fibromyalgia', 'osteoporosis', 'joint stiffness', 'joint swelling'],
+      keywords: ['arthritis', 'arthiritis', 'osteoarthritis', 'rheumatoid', 'joint pain', 'gout', 'fibromyalgia', 'osteoporosis', 'joint stiffness', 'joint swelling', 'ankylosing spondylitis'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
-      action: "Manage at home with rest, lifestyle modifications, and scheduled outpatient monitoring.",
-      department: "Primary Care Clinic / Specialized Outpatient Care",
-      medSupport: "Musculoskeletal Care: Physical therapy, low-impact joint conditioning, weight management, calcium/vitamin D supplementation, and anti-inflammatory support (Topical Diclofenac or Ibuprofen) per rheumatology guidance."
+      action: "Outpatient rheumatology/orthopedic care, physical therapy, and joint conditioning.",
+      department: "Rheumatology / Orthopedic Clinic",
+      medSupport: "Musculoskeletal Care: Physical therapy, low-impact exercise, calcium/vitamin D, urate-lowering therapy (for gout), and topical/oral anti-inflammatories."
     },
     {
-      keywords: ['muscle strain', 'sprain', 'back pain', 'neck pain', 'shoulder pain', 'knee pain', 'heel pain', 'plantar fasciitis', 'sciatica', 'muscle soreness'],
+      keywords: ['muscle strain', 'sprain', 'back pain', 'neck pain', 'shoulder pain', 'knee pain', 'heel pain', 'plantar fasciitis', 'sciatica', 'muscle soreness', 'carpal tunnel', 'tendonitis'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
       action: "Manage with RICE protocol, physical therapy stretching, and ergonomic adjustments.",
       department: "Primary Care / Physical Therapy",
-      medSupport: "Orthopedic Routine Care: Rest, ice, compression, elevation (RICE), physical therapy stretching routines, ergonomic posture adjustments, and topical analgesic gels."
+      medSupport: "Orthopedic Routine Care: Rest, ice, compression, elevation (RICE), ergonomic adjustments, targeted stretching, and topical analgesic gels."
     },
-
-    // --- 6. PULMONARY & RESPIRATORY ---
     {
-      keywords: ['asthma', 'asthama', 'astma', 'wheezing', 'copd', 'bronchitis', 'emphysema', 'bronchiectasis', 'cystic fibrosis', 'chronic cough'],
+      keywords: ['asthma', 'asthama', 'astma', 'wheezing', 'copd', 'bronchitis', 'emphysema', 'bronchiectasis', 'cystic fibrosis', 'chronic cough', 'sleep apnea'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
-      action: "Manage at home with rest, lifestyle modifications, and scheduled outpatient monitoring.",
-      department: "Primary Care Clinic / Specialized Outpatient Care",
-      medSupport: "Pulmonary Care: Trigger avoidance (smoke, allergens, pollutants), pulmonary rehabilitation exercises, maintenance inhalers, and accessible rescue inhalers."
+      action: "Outpatient pulmonology follow-up, spirometry, and inhaler/CPAP adherence.",
+      department: "Pulmonology Clinic",
+      medSupport: "Pulmonary Care: Trigger avoidance, maintenance controller inhalers, accessible rescue bronchodilators, and pulmonary rehabilitation."
     },
     {
-      keywords: ['cold', 'cough', 'runny nose', 'throat', 'sore', 'flu', 'sinusitis', 'sinus', 'rhinitis', 'tonsillitis', 'laryngitis', 'common cold', 'sneezing', 'nasal congestion'],
+      keywords: ['cold', 'cough', 'runny nose', 'throat', 'sore', 'flu', 'influenza', 'sinusitis', 'sinus', 'rhinitis', 'tonsillitis', 'laryngitis', 'common cold', 'sneezing', 'nasal congestion'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
       action: "Manage at home with rest and hydration. Consult primary care if symptoms persist over 5-7 days.",
       department: "Primary Care Clinic / Home Care",
-      medSupport: "Upper Respiratory Care: Dextromethorphan (cough suppressant), warm saline gargles, decongestants, lozenges, and Paracetamol for mild body aches."
+      medSupport: "Upper Respiratory Care: Warm saline gargles, steam inhalation, lozenges, decongestants, and Paracetamol for mild fever/body aches."
     },
 
-    // --- 7. CARDIOVASCULAR & NEUROLOGICAL ---
+    // ==========================================
+    // 11. CARDIOVASCULAR, NEUROLOGICAL & MENTAL HEALTH
+    // ==========================================
     {
-      keywords: ['hypertension', 'high blood pressure', 'bp', 'atherosclerosis', 'arrhythmia', 'angina', 'heart failure', 'elevated bp'],
+      keywords: ['hypertension', 'high blood pressure', 'bp', 'atherosclerosis', 'arrhythmia', 'angina', 'heart failure', 'elevated bp', 'palpitations', 'varicose veins'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
-      action: "Manage at home with rest, lifestyle modifications, and scheduled outpatient monitoring.",
-      department: "Primary Care Clinic / Specialized Outpatient Care",
-      medSupport: "Cardiovascular Care: Daily blood pressure logging, DASH diet (low sodium), stress reduction, and consistent adherence to antihypertensives."
+      action: "Scheduled outpatient cardiology monitoring, daily BP logging, and lifestyle modifications.",
+      department: "Cardiology / Primary Care Clinic",
+      medSupport: "Cardiovascular Care: Daily blood pressure log, DASH low-sodium diet, regular aerobic exercise, and adherence to prescribed antihypertensives."
     },
     {
-      keywords: ['headache', 'migraine', 'migrane', 'tension headache', 'cluster headache'],
+      keywords: ['headache', 'migraine', 'migrane', 'tension headache', 'cluster headache', 'neuropathy', 'peripheral neuropathy', 'epilepsy', 'parkinson', 'alzheimer', 'dementia', 'multiple sclerosis'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
-      action: "Manage at home with rest, lifestyle modifications, and scheduled outpatient monitoring.",
-      department: "Primary Care Clinic / Specialized Outpatient Care",
-      medSupport: "Neurological Routine Care: Paracetamol or Ibuprofen, rest in a quiet, dark environment, hydration, and trigger identification."
+      action: "Outpatient neurology consultation, symptom diary tracking, and maintenance therapy.",
+      department: "Neurology Outpatient Clinic",
+      medSupport: "Neurological Routine Care: Migraine abortive/preventive therapy, quiet dark rest, neuropathic pain agents, or structured neurological rehabilitation."
     },
     {
-      keywords: ['eczema', 'psoriasis', 'dermatitis', 'rash', 'acne', 'rosacea', 'hives', 'urticaria', 'vitiligo'],
+      keywords: ['anxiety', 'depression', 'insomnia', 'stress', 'panic disorder', 'adhd', 'bipolar', 'ptsd', 'ocd', 'sleep disorder', 'burnout'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
-      action: "Manage at home with rest, lifestyle modifications, and scheduled outpatient monitoring.",
-      department: "Primary Care Clinic / Specialized Outpatient Care",
-      medSupport: "Dermatological Care: Topical emollients, barrier repair creams, prescribed topical corticosteroids or calcineurin inhibitors, and gentle fragrance-free cleansers."
-    },
-    {
-      keywords: ['anxiety', 'depression', 'insomnia', 'stress', 'panic disorder', 'adhd', 'bipolar', 'ptsd', 'ocd', 'sleep disorder'],
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Manage at home with rest, lifestyle modifications, and scheduled outpatient monitoring.",
-      department: "Primary Care Clinic / Specialized Outpatient Care",
-      medSupport: "Mental Wellness & Sleep Support: Cognitive behavioral strategies, sleep hygiene optimization (consistent schedule, dark room), mindfulness, and professional psychological evaluation."
+      action: "Outpatient behavioral health consultation, psychotherapy, and structured sleep/stress routines.",
+      department: "Psychiatry & Behavioral Health",
+      medSupport: "Mental Wellness & Sleep Support: Cognitive behavioral therapy (CBT), consistent sleep hygiene, mindfulness, and physician-supervised pharmacotherapy if indicated."
     }
   ];
 
@@ -415,12 +811,15 @@
     'sudden paralysis', 'paralysis', 'facial drooping', 'face drooping', 'slurred speech',
     'speech slurring', 'slurring', 'speech difficulty', 'trouble speaking', 'cant speak', "can't speak",
     'numb', 'numbness', 'tingling', 'one side weak', 'arm weakness', 'loss of balance',
-    'sudden confusion', 'blurred vision', 'vision loss', 'double vision',
+    'sudden confusion', 'blurred vision', 'vision loss', 'double vision', 'sudden blindness',
     'faint', 'fainting', 'passed out', 'blackout', 'blacking out', 'syncope', 'collapsed',
     'severe head injury', 'internal bleeding', 'choking', 'severe burns', 'electric shock',
-    'septic shock', 'acute appendicitis', 'bowel perforation',
+    'septic shock', 'sepsis', 'meningitis', 'acute appendicitis', 'bowel perforation',
+    'pulmonary embolism', 'deep vein thrombosis', 'dvt', 'aortic dissection', 'ectopic pregnancy',
+    'testicular torsion', 'glaucoma attack', 'acute angle closure', 'heat stroke', 'hypothermia',
+    'severe hypokalemia', 'severe hyponatremia', 'tetany', 'wernicke encephalopathy',
     'snake bite', 'snakebite', 'venom', 'venomous bite', 'poisonous bite',
-    'animal bite', 'severe sting', 'multiple bee stings', 'scorpion sting', 'spider bite'
+    'animal bite', 'dog bite', 'rabies exposure', 'severe sting', 'multiple bee stings', 'scorpion sting', 'spider bite'
   ];
 
   // --- URGENT CONDITIONS (LEVEL 3) ---
@@ -435,8 +834,9 @@
     'uncontrolled bleeding', 'severe migraine', 'severe migrane', 'kidney stone', 'renal colic',
     'severe burn', 'pneumonia', 'pnuemonia', 'severe dehydration', 'acute chest infection',
     'high blood pressure spike', 'concussion', 'tachycardia', 'severe back spasm',
-    'blood in urine', 'bloody stool', 'cellulitis', 'dislocated joint', 'acute cholecystitis',
-    'severe ear infection', 'gallbladder pain', 'pancreatitis'
+    'blood in urine', 'hematuria', 'bloody stool', 'melena', 'vomiting blood', 'hematemesis',
+    'cellulitis', 'dislocated joint', 'acute cholecystitis', 'severe ear infection',
+    'gallbladder pain', 'pancreatitis', 'coughing up blood', 'unexplained weight loss', 'breast lump'
   ];
 
   btn.addEventListener('click', async () => {
@@ -477,7 +877,7 @@
         color = "#f59e0b";
         action = "Prompt clinical evaluation recommended within 30-60 minutes. Sit or lie down.";
         department = "Urgent Care / Ambulatory Clinic";
-        medSupport = "Targeted urgent care options: Vitals check, electrolytes, vestibular suppressants, or fast-acting antihistamines.";
+        medSupport = "Targeted urgent care options: Vitals check, diagnostic labs/imaging, electrolytes, or fast-acting targeted therapy.";
       } else {
         const matchedRecord = clinicalDatabase.find(record =>
           record.keywords.some(kw => hasPhrase(lower, kw))
