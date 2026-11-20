@@ -158,7 +158,6 @@
   let lastVectorDim = 768;
   let lastSimilarity = null;
   let engineStatus = "Local Bio_ClinicalBERT Ready";
-  let isRunning = false;
 
   async function getTransformers() {
     if (transformersMod) return transformersMod;
@@ -760,7 +759,6 @@
     return bestMatch;
   }
 
-  // Cap max_length to 128 tokens for fast interactive speed without freezing the UI
   async function embedText(pipe, str) {
     const out = await pipe(str, {
       pooling: 'mean',
@@ -845,22 +843,22 @@
       `<i>Disclaimer: AI prototype for science exhibition demonstration. Requires physician verification.</i>`;
   }
 
+  // Never disable or block the button across clicks; always process the latest input immediately
   btn.addEventListener('click', async () => {
-    if (isRunning) return;
+    btn.disabled = false;
     const text = input.value.trim();
     if (!text) {
       output.textContent = "Please enter clinical observations first.";
       return;
     }
 
-    isRunning = true;
+    const requestId = Date.now() + Math.random();
+    btn.dataset.latestReq = String(requestId);
     const startTime = performance.now();
     const ruleTriage = evaluateLongSentenceRules(text);
 
-    // Instant result on any rule/clause match — zero model hang
     if (ruleTriage) {
       renderReport(text, ruleTriage, Math.round(performance.now() - startTime), lastVectorDim, lastSimilarity);
-      isRunning = false;
       return;
     }
 
@@ -881,11 +879,14 @@
 
     try {
       const pipe = await ensureModelLoaded();
+      if (btn.dataset.latestReq !== String(requestId)) return;
       const { userVec, bestScore, triage: semanticTriage } = await classifyWithEmbeddings(pipe, text);
+      if (btn.dataset.latestReq !== String(requestId)) return;
       lastVectorDim = userVec.length;
       lastSimilarity = `Cosine similarity ${bestScore.toFixed(3)} (768-D)`;
       renderReport(text, semanticTriage, Math.round(performance.now() - startTime), lastVectorDim, lastSimilarity);
     } catch (err) {
+      if (btn.dataset.latestReq !== String(requestId)) return;
       renderReport(
         text,
         {
@@ -900,9 +901,8 @@
         lastVectorDim,
         `Fallback (${err.message})`
       );
-    } finally {
-      isRunning = false;
     }
   });
-</script></body>
+</script>
+</body>
 </html>
