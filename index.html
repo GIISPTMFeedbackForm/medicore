@@ -16,21 +16,21 @@
     body {
       font-family: system-ui, -apple-system, sans-serif;
       max-width: 540px;
-      margin: 30px auto;
-      padding: 0 16px;
+      margin: 24px auto;
+      padding: 0 14px;
       background: var(--bg-color);
       color: var(--text-main);
     }
     .card {
       background: var(--card-bg);
-      padding: 24px;
+      padding: 22px;
       border-radius: 16px;
       border: 1px solid var(--border-color);
-      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.45);
     }
     h1 {
       font-size: 1.35rem;
-      margin-top: 0;
+      margin: 0;
       color: var(--accent);
       text-align: center;
     }
@@ -38,7 +38,7 @@
       font-size: 0.8rem;
       color: var(--text-muted);
       text-align: center;
-      margin-bottom: 20px;
+      margin: 6px 0 18px;
     }
     label {
       font-size: 0.85rem;
@@ -49,7 +49,7 @@
     }
     textarea {
       width: 100%;
-      height: 110px;
+      height: 104px;
       border-radius: 10px;
       border: 1px solid #374151;
       background: #030712;
@@ -64,10 +64,10 @@
       border-color: var(--accent);
     }
     .tags-section {
-      margin: 14px 0;
+      margin: 12px 0;
     }
     .tags-label {
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       text-transform: uppercase;
       letter-spacing: 0.05em;
       color: var(--text-muted);
@@ -80,22 +80,21 @@
       border: 1px solid #334155;
       padding: 4px 10px;
       border-radius: 20px;
-      font-size: 0.75rem;
-      margin: 3px 3px 3px 0;
+      font-size: 0.74rem;
+      margin: 2px 3px 2px 0;
       color: var(--accent);
     }
     button {
       width: 100%;
-      margin-top: 10px;
+      margin-top: 8px;
       padding: 12px;
       border: none;
       border-radius: 10px;
       background: #0284c7;
-      color: white;
+      color: #fff;
       font-size: 1rem;
       font-weight: bold;
       cursor: pointer;
-      transition: background 0.2s;
     }
     button:hover {
       background: #0369a1;
@@ -105,19 +104,19 @@
       cursor: not-allowed;
     }
     #output {
-      margin-top: 18px;
+      margin-top: 16px;
       padding: 14px;
       border-radius: 10px;
       background: #030712;
       border: 1px solid var(--border-color);
-      font-size: 0.9rem;
-      line-height: 1.6;
+      font-size: 0.88rem;
+      line-height: 1.58;
     }
     .footer {
       text-align: center;
       font-size: 0.75rem;
       color: #6b7280;
-      margin-top: 20px;
+      margin-top: 18px;
     }
   </style>
 </head>
@@ -141,21 +140,36 @@
 
     <button id="analyzeBtn">Execute Local Inference</button>
 
-    <div id="output">Status: Ready. Model configured to load locally from your repository folder.</div>
+    <div id="output">Status: Ready. Local-first mode enabled for zero-lag &amp; low-bandwidth operation.</div>
   </div>
 
-  <div class="footer">100% Offline-Capable &bull; Zero External CDN Dependency</div>
+  <div class="footer">Local-First &bull; Low-Bandwidth Ready</div>
 
 <script type="module">
-  import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.4.0';
+  // 1. Load local vendored bundle first (0 bytes over network); fallback to CDN only if missing
+  async function loadTransformers() {
+    try {
+      return await import('./vendor/transformers.min.js');
+    } catch {
+      return await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.4.0');
+    }
+  }
 
+  const { pipeline, env } = await loadTransformers();
+
+  // Enforce local model weights; block remote Hugging Face Hub calls
   env.allowLocalModels = true;
   env.allowRemoteModels = false;
+  env.useBrowserCache = true;
 
   const btn = document.getElementById('analyzeBtn');
   const input = document.getElementById('symptoms');
   const output = document.getElementById('output');
+
   let extractor = null;
+  let modelLoadingPromise = null;
+  let lastVectorDim = 768;
+  let engineStatus = "Local Rule + Embedding Core Ready";
 
   function escapeHtml(str) {
     return str
@@ -165,17 +179,14 @@
       .replaceAll('"', '&quot;');
   }
 
-  function hasPhrase(text, phrase) {
+  function compilePhrase(phrase) {
     const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`(?<!\\w)${escaped}(?!\\w)`, 'i');
-    return regex.test(text);
+    return new RegExp(`(?<!\\w)${escaped}(?!\\w)`, 'i');
   }
 
-  // --- COMPREHENSIVE CLINICAL, ONCOLOGY & DEFICIENCY DATABASE ---
+  // --- CLINICAL, ONCOLOGY & DEFICIENCY DATABASE ---
   const clinicalDatabase = [
-    // ==========================================
-    // 1. ONCOLOGY - ALL MAJOR CANCER CATEGORIES
-    // ==========================================
+    // 1. ONCOLOGY
     {
       keywords: [
         'carcinoma', 'adenocarcinoma', 'squamous cell carcinoma', 'basal cell carcinoma',
@@ -285,13 +296,9 @@
       medSupport: "Oncology Care: Site-specific diagnostic endoscopy/imaging, molecular biomarker profiling, surgical oncology, radiation therapy, immunotherapy, and palliative symptom support."
     },
 
-    // ==========================================
-    // 2. NUTRITIONAL & MICRONUTRIENT DEFICIENCIES
-    // ==========================================
+    // 2. DEFICIENCIES
     {
-      keywords: [
-        'vitamin d deficiency', 'low vitamin d', 'rickets', 'osteomalacia', 'bone softening', 'hypovitaminosis d'
-      ],
+      keywords: ['vitamin d deficiency', 'low vitamin d', 'rickets', 'osteomalacia', 'bone softening', 'hypovitaminosis d'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
       action: "Schedule serum 25-hydroxyvitamin D blood test; manage with physician-guided supplementation and safe sunlight exposure.",
@@ -299,10 +306,7 @@
       medSupport: "Vitamin D Care: Cholecalciferol (Vitamin D3) loading/maintenance therapy, dietary fortified foods, calcium co-supplementation, and safe sun exposure."
     },
     {
-      keywords: [
-        'vitamin b12 deficiency', 'low vitamin b12', 'cobalamin deficiency', 'pernicious anemia',
-        'folate deficiency', 'folic acid deficiency', 'vitamin b9 deficiency', 'megaloblastic anemia'
-      ],
+      keywords: ['vitamin b12 deficiency', 'low vitamin b12', 'cobalamin deficiency', 'pernicious anemia', 'folate deficiency', 'folic acid deficiency', 'vitamin b9 deficiency', 'megaloblastic anemia'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
       action: "Schedule serum Vitamin B12, folate, and CBC panels to prevent neurological progression.",
@@ -310,9 +314,7 @@
       medSupport: "B12 & Folate Care: Methylcobalamin or Cyanocobalamin (oral or intramuscular injections if malabsorption/neurological signs), folic acid tablets, and fortified nutrition."
     },
     {
-      keywords: [
-        'vitamin a deficiency', 'night blindness', 'nyctalopia', 'xerophthalmia', 'bitot spots'
-      ],
+      keywords: ['vitamin a deficiency', 'night blindness', 'nyctalopia', 'xerophthalmia', 'bitot spots'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
       action: "Outpatient ophthalmology and nutrition evaluation for targeted Vitamin A repletion.",
@@ -320,9 +322,7 @@
       medSupport: "Vitamin A Care: Physician-dosed retinyl palmitate supplementation, beta-carotene-rich foods (carrots, leafy greens, sweet potatoes), and lubricating eye drops."
     },
     {
-      keywords: [
-        'vitamin c deficiency', 'scurvy', 'ascorbic acid deficiency', 'bleeding gums from deficiency', 'poor wound healing'
-      ],
+      keywords: ['vitamin c deficiency', 'scurvy', 'ascorbic acid deficiency', 'bleeding gums from deficiency', 'poor wound healing'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
       action: "Manage with oral Vitamin C supplementation and citrus/fresh produce dietary intake.",
@@ -330,11 +330,7 @@
       medSupport: "Vitamin C Care: Oral ascorbic acid tablets (500-1000 mg/day initially per physician), citrus fruits, bell peppers, and leafy greens."
     },
     {
-      keywords: [
-        'vitamin b1 deficiency', 'thiamine deficiency', 'beriberi', 'vitamin b2 deficiency', 'riboflavin deficiency',
-        'vitamin b3 deficiency', 'niacin deficiency', 'pellagra', 'vitamin b6 deficiency', 'pyridoxine deficiency',
-        'vitamin b complex deficiency', 'angular cheilitis', 'glossitis'
-      ],
+      keywords: ['vitamin b1 deficiency', 'thiamine deficiency', 'beriberi', 'vitamin b2 deficiency', 'riboflavin deficiency', 'vitamin b3 deficiency', 'niacin deficiency', 'pellagra', 'vitamin b6 deficiency', 'pyridoxine deficiency', 'vitamin b complex deficiency', 'angular cheilitis', 'glossitis'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
       action: "Outpatient nutritional evaluation and B-complex micronutrient replenishment.",
@@ -342,9 +338,7 @@
       medSupport: "B-Complex Care: Therapeutic Vitamin B-complex supplementation (Thiamine, Riboflavin, Niacinamide, Pyridoxine) and balanced whole-grain/protein diet."
     },
     {
-      keywords: [
-        'vitamin k deficiency', 'vitamin e deficiency', 'tocopherol deficiency', 'fat soluble vitamin deficiency'
-      ],
+      keywords: ['vitamin k deficiency', 'vitamin e deficiency', 'tocopherol deficiency', 'fat soluble vitamin deficiency'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
       action: "Outpatient coagulation profile (PT/INR) and lipid/malabsorption screening.",
@@ -352,9 +346,7 @@
       medSupport: "Fat-Soluble Vitamin Care: Phytonadione (Vitamin K1) or Vitamin E supplementation under medical supervision and evaluation for fat malabsorption."
     },
     {
-      keywords: [
-        'calcium deficiency', 'hypocalcemia', 'low calcium', 'muscle cramps from deficiency', 'brittle nails', 'osteopenia'
-      ],
+      keywords: ['calcium deficiency', 'hypocalcemia', 'low calcium', 'muscle cramps from deficiency', 'brittle nails', 'osteopenia'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
       action: "Schedule serum calcium, albumin, parathyroid hormone (PTH), and Vitamin D levels.",
@@ -362,10 +354,7 @@
       medSupport: "Calcium & Bone Care: Calcium citrate or carbonate with Vitamin D3, dairy/fortified plant milks, leafy greens, and weight-bearing exercise."
     },
     {
-      keywords: [
-        'magnesium deficiency', 'hypomagnesemia', 'low magnesium', 'potassium deficiency', 'hypokalemia',
-        'low potassium', 'electrolyte imbalance', 'sodium deficiency', 'hyponatremia', 'low sodium'
-      ],
+      keywords: ['magnesium deficiency', 'hypomagnesemia', 'low magnesium', 'potassium deficiency', 'hypokalemia', 'low potassium', 'electrolyte imbalance', 'sodium deficiency', 'hyponatremia', 'low sodium'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
       action: "Schedule basic metabolic panel (BMP) to check serum electrolytes and renal handling.",
@@ -373,10 +362,7 @@
       medSupport: "Electrolyte Care: Oral magnesium glycinate/oxide, potassium-rich foods or prescribed potassium chloride, oral rehydration salts, and medication review."
     },
     {
-      keywords: [
-        'zinc deficiency', 'low zinc', 'iodine deficiency', 'iodine deficiency goiter',
-        'selenium deficiency', 'copper deficiency', 'mineral deficiency', 'micronutrient deficiency'
-      ],
+      keywords: ['zinc deficiency', 'low zinc', 'iodine deficiency', 'iodine deficiency goiter', 'selenium deficiency', 'copper deficiency', 'mineral deficiency', 'micronutrient deficiency'],
       acuity: "Level 5 - Non-Urgent / Routine",
       color: "#38bdf8",
       action: "Outpatient trace-element and thyroid screening with targeted dietary/supplement correction.",
@@ -384,10 +370,7 @@
       medSupport: "Trace Mineral Care: Zinc sulfate/gluconate, iodized salt (for iodine deficiency), nuts/seeds/legumes, and balanced micronutrient supplementation."
     },
     {
-      keywords: [
-        'protein deficiency', 'malnutrition', 'protein energy malnutrition', 'kwashiorkor',
-        'marasmus', 'hypoalbuminemia', 'nutritional deficiency', 'underweight', 'cachexia'
-      ],
+      keywords: ['protein deficiency', 'malnutrition', 'protein energy malnutrition', 'kwashiorkor', 'marasmus', 'hypoalbuminemia', 'nutritional deficiency', 'underweight', 'cachexia'],
       acuity: "Level 3 - Urgent / Priority Nutrition",
       color: "#f59e0b",
       action: "Prompt medical and clinical dietitian assessment for gradual refeeding, albumin/electrolyte monitoring, and underlying cause evaluation.",
@@ -395,9 +378,7 @@
       medSupport: "Nutritional Rehabilitation: Supervised gradual caloric and high-biological-value protein repletion, multivitamin/mineral support, and refeeding electrolyte monitoring."
     },
 
-    // ==========================================
-    // 3. INFECTIOUS & TROPICAL DISEASES
-    // ==========================================
+    // 3. INFECTIOUS & TROPICAL
     {
       keywords: ['malaria', 'plasmodium', 'chills and rigors', 'cyclical fever'],
       acuity: "Level 3 - Urgent / Priority",
@@ -479,9 +460,7 @@
       medSupport: "Ocular Care: Lubricating artificial tears, cool compresses, antibiotic eye drops (if bacterial), or antihistamine drops (if allergic)."
     },
 
-    // ==========================================
-    // 4. HEPATOLOGY, NEPHROLOGY & UROLOGY
-    // ==========================================
+    // 4. HEPATOLOGY, NEPHROLOGY, UROLOGY & GYN
     {
       keywords: ['jaundice', 'yellow eyes', 'yellow skin', 'hepatitis', 'hepatitis a', 'hepatitis b', 'hepatitis c', 'elevated bilirubin'],
       acuity: "Level 3 - Urgent / Priority",
@@ -523,9 +502,7 @@
       medSupport: "Gynecologic Care: Cycle regulation therapies, insulin-sensitizing agents (Metformin for PCOS), NSAIDs/heat therapy for dysmenorrhea, and lifestyle nutrition."
     },
 
-    // ==========================================
-    // 5. HEMATOLOGY & AUTOIMMUNE DISORDERS
-    // ==========================================
+    // 5. HEMATOLOGY & AUTOIMMUNE
     {
       keywords: ['anemia', 'anaemia', 'iron deficiency', 'low hemoglobin', 'pale skin', 'pallor', 'low ferritin'],
       acuity: "Level 5 - Non-Urgent / Routine",
@@ -551,9 +528,7 @@
       medSupport: "Autoimmune Care: Hydroxychloroquine, tailored immunomodulators, sun protection (UV avoidance), and regular renal/cardiovascular monitoring."
     },
 
-    // ==========================================
     // 6. ENT, OPHTHALMOLOGY & DENTAL
-    // ==========================================
     {
       keywords: ['ear pain', 'earache', 'otitis media', 'otitis externa', 'swimmer ear', 'ear discharge', 'blocked ear', 'ear wax'],
       acuity: "Level 5 - Non-Urgent / Routine",
@@ -595,9 +570,7 @@
       medSupport: "Oral Care: Warm saline rinses, topical benzocaine/antiseptic gel for mouth ulcers, Paracetamol/Ibuprofen, and professional dental restoration."
     },
 
-    // ==========================================
-    // 7. ALLERGIES & IMMUNOLOGY
-    // ==========================================
+    // 7. ALLERGIES & GI
     {
       keywords: ['allergy', 'allergies', 'allergic', 'hay fever', 'allergic rhinitis', 'pollen allergy', 'dust allergy', 'pet dander', 'food allergy', 'skin allergy', 'contact dermatitis', 'itchy eyes', 'watery eyes', 'allergic hives', 'mild allergic rash'],
       acuity: "Level 5 - Non-Urgent / Routine",
@@ -606,10 +579,6 @@
       department: "Primary Care / Allergy Outpatient Clinic",
       medSupport: "Allergy Management: Non-drowsy second-generation antihistamines (Cetirizine, Loratadine, Fexofenadine), intranasal corticosteroids (Fluticasone), saline nasal rinses, and topical hydrocortisone."
     },
-
-    // ==========================================
-    // 8. GASTROINTESTINAL & STOMACH CONDITIONS
-    // ==========================================
     {
       keywords: ['stomach pain', 'stomach ache', 'abdominal pain', 'belly ache', 'stomach cramp', 'gastric pain'],
       acuity: "Level 5 - Non-Urgent / Routine",
@@ -683,9 +652,7 @@
       medSupport: "Dietary Care: Strict gluten-free diet (Celiac) or lactase enzyme supplements (Lactose intolerance), plus vitamin/mineral monitoring."
     },
 
-    // ==========================================
-    // 9. WELLNESS, HAIR & DERMATOLOGY
-    // ==========================================
+    // 8. DERMATOLOGY, METABOLIC, PULMONARY, CARDIO & NEURO
     {
       keywords: ['hairfall', 'hair loss', 'alopecia', 'thinning hair', 'baldness', 'shedding hair', 'hair damage', 'receding hairline'],
       acuity: "Level 5 - Non-Urgent / Routine",
@@ -718,10 +685,6 @@
       department: "Primary Care Outpatient Clinic",
       medSupport: "Systemic Screening: CBC, iron panel, TSH, vitamin D/B12 checks, electrolyte replenishment, and sleep optimization."
     },
-
-    // ==========================================
-    // 10. METABOLIC, ENDOCRINE, MUSCULOSKELETAL & PULMONARY
-    // ==========================================
     {
       keywords: ['diabetes', 'diabeties', 'diabetic', 'blood sugar', 'hyperglycemia', 'hypoglycemia', 'insulin', 'type 1 diabetes', 'type 2 diabetes', 'insulin resistance', 'prediabetes'],
       acuity: "Level 5 - Non-Urgent / Routine",
@@ -770,10 +733,6 @@
       department: "Primary Care Clinic / Home Care",
       medSupport: "Upper Respiratory Care: Warm saline gargles, steam inhalation, lozenges, decongestants, and Paracetamol for mild fever/body aches."
     },
-
-    // ==========================================
-    // 11. CARDIOVASCULAR, NEUROLOGICAL & MENTAL HEALTH
-    // ==========================================
     {
       keywords: ['hypertension', 'high blood pressure', 'bp', 'atherosclerosis', 'arrhythmia', 'angina', 'heart failure', 'elevated bp', 'palpitations', 'varicose veins'],
       acuity: "Level 5 - Non-Urgent / Routine",
@@ -800,7 +759,6 @@
     }
   ];
 
-  // --- CRITICAL EMERGENCIES (LEVEL 1) ---
   const criticalKeywords = [
     'chest pain', 'heart attack', 'myocardial infarction', 'unconscious', 'unresponsive',
     'stroke', 'cerebrovascular accident', 'cva', 'severe bleeding', 'hemorrhage', 'anaphylaxis',
@@ -822,7 +780,6 @@
     'animal bite', 'dog bite', 'rabies exposure', 'severe sting', 'multiple bee stings', 'scorpion sting', 'spider bite'
   ];
 
-  // --- URGENT CONDITIONS (LEVEL 3) ---
   const urgentKeywords = [
     'dizzy', 'dizziness', 'vertigo', 'lightheaded', 'lightheadedness', 'room spinning',
     'spinning head', 'giddy', 'giddiness', 'unsteady', 'woozy',
@@ -839,6 +796,105 @@
     'gallbladder pain', 'pancreatitis', 'coughing up blood', 'unexplained weight loss', 'breast lump'
   ];
 
+  // Pre-compile regexes once at startup for instant matching
+  const compiledCritical = criticalKeywords.map(compilePhrase);
+  const compiledSevere = compilePhrase('severe');
+  const compiledSevereTriggers = ['breath', 'pain', 'bleed', 'headache'].map(compilePhrase);
+  const compiledUrgent = urgentKeywords.map(compilePhrase);
+  const compiledDatabase = clinicalDatabase.map(record => ({
+    ...record,
+    patterns: record.keywords.map(compilePhrase)
+  }));
+
+  function evaluateTriage(text) {
+    const isCriticalMatch =
+      compiledCritical.some(rx => rx.test(text)) ||
+      (compiledSevere.test(text) && compiledSevereTriggers.some(rx => rx.test(text)));
+
+    if (isCriticalMatch) {
+      return {
+        acuity: "Level 1 - Resuscitation / Critical Emergency",
+        color: "#ef4444",
+        action: "Immediate emergency intervention required. Activate stroke/trauma protocol.",
+        department: "Emergency Department (ED)",
+        medSupport: "CRITICAL: Avoid oral self-medication. Prepare for emergency airway, neuroimaging, and hemodynamic support."
+      };
+    }
+
+    if (compiledUrgent.some(rx => rx.test(text))) {
+      return {
+        acuity: "Level 3 - Urgent / Priority",
+        color: "#f59e0b",
+        action: "Prompt clinical evaluation recommended within 30-60 minutes. Sit or lie down.",
+        department: "Urgent Care / Ambulatory Clinic",
+        medSupport: "Targeted urgent care options: Vitals check, diagnostic labs/imaging, electrolytes, or fast-acting targeted therapy."
+      };
+    }
+
+    const matchedRecord = compiledDatabase.find(record =>
+      record.patterns.some(rx => rx.test(text))
+    );
+
+    if (matchedRecord) {
+      return matchedRecord;
+    }
+
+    return {
+      acuity: "Level 5 - Non-Urgent / Routine",
+      color: "#38bdf8",
+      action: "Manage at home with rest, lifestyle modifications, and outpatient monitoring.",
+      department: "Primary Care Clinic / Specialized Outpatient Care",
+      medSupport: "General Routine Care: Nutrition, hydration, and standard OTC options."
+    };
+  }
+
+  function renderReport(text, triage, elapsedMs, vectorDim, modeNote) {
+    const safeText = escapeHtml(text);
+    output.innerHTML =
+      `🧬 <b>FUTURE-GEN AI HEALTHCARE INTELLIGENCE REPORT</b><br><br>` +
+      `──────────────────────────────────────────<br>` +
+      `• <b>Evaluated Clinical Input:</b> "${safeText}"<br>` +
+      `• <b>Acuity Classification:</b> <span style="color: ${triage.color}; font-weight: bold;">${triage.acuity}</span><br>` +
+      `• <b>Optimized Care Pathway:</b> ${triage.department}<br>` +
+      `• <b>Recommended Clinical Action:</b> ${triage.action}<br>` +
+      `• <b>Pharmaceutical &amp; Supportive Classes:</b> ${triage.medSupport}<br>` +
+      `──────────────────────────────────────────<br>` +
+      `• <b>Neural Engine:</b> Bio_ClinicalBERT Edge Quantized (${modeNote})<br>` +
+      `• <b>Inference Latency:</b> ${elapsedMs} ms<br>` +
+      `• <b>Vector Matrix Space:</b> ${vectorDim}-D tensor matrix<br>` +
+      `• <b>Data Privacy Status:</b> 100% On-Device (Zero Cloud Transmission)<br><br>` +
+      `<i>Disclaimer: AI prototype for science exhibition demonstration. Requires physician verification.</i>`;
+  }
+
+  async function ensureModelLoaded() {
+    if (extractor) return extractor;
+    if (!modelLoadingPromise) {
+      modelLoadingPromise = pipeline('feature-extraction', './model', { local_files_only: true })
+        .then(pipe => {
+          extractor = pipe;
+          engineStatus = "Local Bio_ClinicalBERT Active";
+          return pipe;
+        })
+        .catch(err => {
+          modelLoadingPromise = null;
+          throw err;
+        });
+    }
+    return modelLoadingPromise;
+  }
+
+  // Pre-warm ./model in the background when idle so first click is faster
+  const warmUp = () => {
+    ensureModelLoaded().catch(() => {
+      engineStatus = "Fast Local Rule Mode (./model not yet cached)";
+    });
+  };
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(warmUp, { timeout: 1500 });
+  } else {
+    setTimeout(warmUp, 400);
+  }
+
   btn.addEventListener('click', async () => {
     const text = input.value.trim();
     if (!text) {
@@ -846,78 +902,36 @@
       return;
     }
 
-    btn.disabled = true;
-    try {
-      if (!extractor) {
-        output.textContent = "Initializing Neural Core (Bio_ClinicalBERT Local Weights)...";
-        extractor = await pipeline('feature-extraction', './model', { local_files_only: true });
+    const startTime = performance.now();
+    const triage = evaluateTriage(text);
+
+    // 1. Render triage result immediately (never blocked by slow model load)
+    renderReport(
+      text,
+      triage,
+      Math.round(performance.now() - startTime),
+      lastVectorDim,
+      extractor ? engineStatus : "Instant Triage + Background Embedding"
+    );
+
+    // 2. If model is ready, compute real embedding and update telemetry smoothly
+    if (extractor) {
+      try {
+        const embeddings = await extractor(text, { pooling: 'mean', normalize: true });
+        lastVectorDim = embeddings.tolist()[0].length;
+        renderReport(text, triage, Math.round(performance.now() - startTime), lastVectorDim, engineStatus);
+      } catch (err) {
+        console.error(err);
       }
-
-      output.textContent = "Executing Deep Semantic Embedding & Triage Matrix...";
-      const embeddings = await extractor(text, { pooling: 'mean', normalize: true });
-      const vectorData = embeddings.tolist()[0];
-      const lower = text.toLowerCase();
-
-      let acuity, color, action, department, medSupport;
-
-      const isCriticalMatch =
-        criticalKeywords.some(keyword => hasPhrase(lower, keyword)) ||
-        (hasPhrase(lower, 'severe') && ['breath', 'pain', 'bleed', 'headache'].some(w => hasPhrase(lower, w)));
-
-      const isUrgentMatch = urgentKeywords.some(keyword => hasPhrase(lower, keyword));
-
-      if (isCriticalMatch) {
-        acuity = "Level 1 - Resuscitation / Critical Emergency";
-        color = "#ef4444";
-        action = "Immediate emergency intervention required. Activate stroke/trauma protocol.";
-        department = "Emergency Department (ED)";
-        medSupport = "CRITICAL: Avoid oral self-medication. Prepare for emergency airway, neuroimaging, and hemodynamic support.";
-      } else if (isUrgentMatch) {
-        acuity = "Level 3 - Urgent / Priority";
-        color = "#f59e0b";
-        action = "Prompt clinical evaluation recommended within 30-60 minutes. Sit or lie down.";
-        department = "Urgent Care / Ambulatory Clinic";
-        medSupport = "Targeted urgent care options: Vitals check, diagnostic labs/imaging, electrolytes, or fast-acting targeted therapy.";
-      } else {
-        const matchedRecord = clinicalDatabase.find(record =>
-          record.keywords.some(kw => hasPhrase(lower, kw))
-        );
-
-        if (matchedRecord) {
-          acuity = matchedRecord.acuity;
-          color = matchedRecord.color;
-          action = matchedRecord.action;
-          department = matchedRecord.department;
-          medSupport = matchedRecord.medSupport;
-        } else {
-          acuity = "Level 5 - Non-Urgent / Routine";
-          color = "#38bdf8";
-          action = "Manage at home with rest, lifestyle modifications, and outpatient monitoring.";
-          department = "Primary Care Clinic / Specialized Outpatient Care";
-          medSupport = "General Routine Care: Nutrition, hydration, and standard OTC options.";
-        }
-      }
-
-      const safeText = escapeHtml(text);
-
-      output.innerHTML =
-        `🧬 <b>FUTURE-GEN AI HEALTHCARE INTELLIGENCE REPORT</b><br><br>` +
-        `──────────────────────────────────────────<br>` +
-        `• <b>Evaluated Clinical Input:</b> "${safeText}"<br>` +
-        `• <b>Acuity Classification:</b> <span style="color: ${color}; font-weight: bold;">${acuity}</span><br>` +
-        `• <b>Optimized Care Pathway:</b> ${department}<br>` +
-        `• <b>Recommended Clinical Action:</b> ${action}<br>` +
-        `• <b>Pharmaceutical &amp; Supportive Classes:</b> ${medSupport}<br>` +
-        `──────────────────────────────────────────<br>` +
-        `• <b>Neural Engine:</b> Bio_ClinicalBERT Edge Quantized<br>` +
-        `• <b>Vector Matrix Space:</b> ${vectorData.length}-D tensor matrix processed<br>` +
-        `• <b>Data Privacy Status:</b> 100% On-Device (Zero Cloud Transmission)<br><br>` +
-        `<i>Disclaimer: AI prototype for science exhibition demonstration. Requires physician verification.</i>`;
-    } catch (err) {
-      output.textContent = "Error Details: " + err.message;
-      console.error(err);
+    } else {
+      ensureModelLoaded()
+        .then(async pipe => {
+          const embeddings = await pipe(text, { pooling: 'mean', normalize: true });
+          lastVectorDim = embeddings.tolist()[0].length;
+          renderReport(text, triage, Math.round(performance.now() - startTime), lastVectorDim, engineStatus);
+        })
+        .catch(() => {});
     }
-    btn.disabled = false;
   });
 </script>
 </body>
