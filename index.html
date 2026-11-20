@@ -147,32 +147,35 @@
   <div class="footer">Local-First &bull; Low-Bandwidth Ready</div>
 
 <script type="module">
-  // 1. Load local vendored bundle first (0 bytes over network); fallback to CDN only if missing
-  async function loadTransformers() {
-    try {
-      return await import('./vendor/transformers.min.js');
-    } catch {
-      return await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.4.0');
-    }
-  }
-
-  const { pipeline, env } = await loadTransformers();
-
-  // Enforce local model weights; block remote Hugging Face Hub calls
-  env.allowLocalModels = true;
-  env.allowRemoteModels = false;
-  env.useBrowserCache = true;
-
   const btn = document.getElementById('analyzeBtn');
   const input = document.getElementById('symptoms');
   const output = document.getElementById('output');
 
+  let transformersMod = null;
   let extractor = null;
   let modelLoadingPromise = null;
   let prototypeVectors = null;
   let lastVectorDim = 768;
   let lastSimilarity = null;
   let engineStatus = "Local Bio_ClinicalBERT Ready";
+  let isRunning = false;
+
+  async function getTransformers() {
+    if (transformersMod) return transformersMod;
+    try {
+      transformersMod = await import('./vendor/transformers.min.js');
+    } catch {
+      transformersMod = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.4.0');
+    }
+    const { env } = transformersMod;
+    env.allowLocalModels = true;
+    env.allowRemoteModels = false;
+    env.useBrowserCache = true;
+    if (env.backends?.onnx?.wasm) {
+      env.backends.onnx.wasm.numThreads = 1;
+    }
+    return transformersMod;
+  }
 
   function escapeHtml(str) {
     return str
@@ -190,25 +193,19 @@
   function cosineSimilarity(vecA, vecB) {
     let dot = 0;
     const len = Math.min(vecA.length, vecB.length);
-    for (let i = 0; i < len; i++) {
-      dot += vecA[i] * vecB[i];
-    }
-    return dot; // valid when both vectors are mean-pooled & L2-normalized
+    for (let i = 0; i < len; i++) dot += vecA[i] * vecB[i];
+    return dot;
   }
 
-  // Split long conversational sentences into clean clauses so filler words ("this that") don't hide symptoms
   function splitIntoClauses(rawText) {
     const parts = rawText
       .split(/[,;.!?\n]+|\b(?:and|or|but|also|plus|along with|with|since|because|like this|this that)\b/gi)
       .map(s => s.trim())
       .filter(s => s.length > 1);
-
     return parts.length ? parts : [rawText.trim()];
   }
 
-  // --- CLINICAL, ONCOLOGY, DEFICIENCY & DISABILITY DATABASE ---
   const clinicalDatabase = [
-    // 1. ONCOLOGY - ALL MAJOR CANCER CATEGORIES
     {
       keywords: [
         'carcinoma', 'adenocarcinoma', 'squamous cell carcinoma', 'basal cell carcinoma',
@@ -317,8 +314,6 @@
       department: "Comprehensive Oncology Clinic",
       medSupport: "Oncology Care: Site-specific diagnostic endoscopy/imaging, molecular biomarker profiling, surgical oncology, radiation therapy, immunotherapy, and palliative symptom support."
     },
-
-    // 2. DISABILITIES & FUNCTIONAL IMPAIRMENTS
     {
       keywords: [
         'hearing problem', 'hearing impairment', 'hearing disability', 'hard of hearing',
@@ -425,8 +420,6 @@
       department: "Psychiatry & Psychosocial Rehabilitation",
       medSupport: "Psychosocial Care: Maintenance antipsychotic/mood-stabilizing therapy under psychiatrist supervision, psychotherapy, and community support programs."
     },
-
-    // 3. NUTRITIONAL & MICRONUTRIENT DEFICIENCIES
     {
       keywords: ['vitamin d deficiency', 'low vitamin d', 'rickets', 'osteomalacia', 'bone softening', 'hypovitaminosis d'],
       acuity: "Level 5 - Non-Urgent / Routine",
@@ -507,8 +500,6 @@
       department: "Internal Medicine & Clinical Nutrition",
       medSupport: "Nutritional Rehabilitation: Supervised gradual caloric and high-biological-value protein repletion, multivitamin/mineral support, and refeeding electrolyte monitoring."
     },
-
-    // 4. INFECTIOUS, ORGAN, METABOLIC, PULMONARY, CARDIO, NEURO & ROUTINE
     {
       keywords: ['fever', 'pyrexia', 'chills', 'shivering', 'malaria', 'plasmodium', 'dengue', 'typhoid', 'enteric fever', 'chikungunya', 'tuberculosis', 'tb', 'covid', 'covid-19', 'chickenpox', 'shingles'],
       acuity: "Level 3 - Urgent / Priority",
@@ -575,7 +566,6 @@
     }
   ];
 
-  // --- CRITICAL EMERGENCIES (LEVEL 1) ---
   const criticalKeywords = [
     'chest pain', 'heart attack', 'myocardial infarction', 'unconscious', 'unresponsive',
     'stroke', 'cerebrovascular accident', 'cva', 'severe bleeding', 'hemorrhage', 'anaphylaxis',
@@ -598,7 +588,6 @@
     'animal bite', 'dog bite', 'rabies exposure', 'severe sting', 'multiple bee stings', 'scorpion sting', 'spider bite'
   ];
 
-  // --- URGENT CONDITIONS (LEVEL 3) ---
   const urgentKeywords = [
     'dizzy', 'dizziness', 'vertigo', 'lightheaded', 'lightheadedness', 'room spinning',
     'spinning head', 'giddy', 'giddiness', 'unsteady', 'woozy',
@@ -616,7 +605,6 @@
     'pressure ulcer', 'bedsore'
   ];
 
-  // --- 768-D BIO_CLINICALBERT SEMANTIC PROTOTYPES FOR UNSTRUCTURED LONG SENTENCES ---
   const semanticPrototypes = [
     {
       label: "Acute Fever & Systemic Infection",
@@ -697,7 +685,6 @@
     }
   ];
 
-  // Pre-compile regexes once at startup for instant matching
   const compiledCritical = criticalKeywords.map(compilePhrase);
   const compiledSevere = compilePhrase('severe');
   const compiledSevereTriggers = ['breath', 'pain', 'bleed', 'headache'].map(compilePhrase);
@@ -773,12 +760,13 @@
     return bestMatch;
   }
 
+  // Cap max_length to 128 tokens for fast interactive speed without freezing the UI
   async function embedText(pipe, str) {
     const out = await pipe(str, {
       pooling: 'mean',
       normalize: true,
       truncation: true,
-      max_length: 512
+      max_length: 128
     });
     return out.tolist()[0];
   }
@@ -786,43 +774,38 @@
   async function ensureModelLoaded() {
     if (extractor) return extractor;
     if (!modelLoadingPromise) {
-      modelLoadingPromise = pipeline('feature-extraction', './model', { local_files_only: true })
-        .then(async pipe => {
-          extractor = pipe;
-          engineStatus = "Local Bio_ClinicalBERT Active (768-D)";
-          if (!prototypeVectors) {
-            prototypeVectors = await Promise.all(
-              semanticPrototypes.map(async proto => ({
-                ...proto,
-                vector: await embedText(pipe, proto.text)
-              }))
-            );
-          }
-          return pipe;
-        })
-        .catch(err => {
-          modelLoadingPromise = null;
-          throw err;
-        });
+      modelLoadingPromise = (async () => {
+        const { pipeline } = await getTransformers();
+        const pipe = await pipeline('feature-extraction', './model', { local_files_only: true });
+        extractor = pipe;
+        engineStatus = "Local Bio_ClinicalBERT Active (768-D, max 128 tok)";
+        return pipe;
+      })().catch(err => {
+        modelLoadingPromise = null;
+        throw err;
+      });
     }
     return modelLoadingPromise;
   }
 
-  async function classifyWithEmbeddings(pipe, userText) {
-    if (!prototypeVectors) {
-      prototypeVectors = await Promise.all(
-        semanticPrototypes.map(async proto => ({
-          ...proto,
-          vector: await embedText(pipe, proto.text)
-        }))
-      );
+  async function ensurePrototypes(pipe) {
+    if (prototypeVectors) return prototypeVectors;
+    const built = [];
+    for (const proto of semanticPrototypes) {
+      const vec = await embedText(pipe, proto.text);
+      built.push({ label: proto.label, vector: vec, triage: proto.triage });
     }
+    prototypeVectors = built;
+    return prototypeVectors;
+  }
 
+  async function classifyWithEmbeddings(pipe, userText) {
+    const protos = await ensurePrototypes(pipe);
     const userVec = await embedText(pipe, userText);
-    let bestProto = semanticPrototypes[3]; // GI/Routine fallback
+    let bestProto = protos[3];
     let bestScore = -1;
 
-    for (const proto of prototypeVectors) {
+    for (const proto of protos) {
       const score = cosineSimilarity(userVec, proto.vector);
       if (score > bestScore) {
         bestScore = score;
@@ -857,89 +840,69 @@
       simLine +
       `• <b>Neural Engine:</b> medicore/Bio_ClinicalBERT (${engineStatus})<br>` +
       `• <b>Inference Latency:</b> ${elapsedMs} ms<br>` +
-      `• <b>Vector Matrix Space:</b> ${vectorDim}-D tensor matrix (max 512 tokens)<br>` +
+      `• <b>Vector Matrix Space:</b> ${vectorDim}-D tensor matrix<br>` +
       `• <b>Data Privacy Status:</b> 100% On-Device (Zero Cloud Transmission)<br><br>` +
       `<i>Disclaimer: AI prototype for science exhibition demonstration. Requires physician verification.</i>`;
   }
 
-  // Pre-warm ./model when idle so first click is faster
-  const warmUp = () => {
-    ensureModelLoaded().catch(() => {
-      engineStatus = "Fast Local Rule Mode (./model unavailable)";
-    });
-  };
-  if ('requestIdleCallback' in window) {
-    requestIdleCallback(warmUp, { timeout: 1500 });
-  } else {
-    setTimeout(warmUp, 400);
-  }
-
   btn.addEventListener('click', async () => {
+    if (isRunning) return;
     const text = input.value.trim();
     if (!text) {
       output.textContent = "Please enter clinical observations first.";
       return;
     }
 
+    isRunning = true;
     const startTime = performance.now();
-    let activeTriage = evaluateLongSentenceRules(text);
+    const ruleTriage = evaluateLongSentenceRules(text);
 
-    // 1. Render immediate result if clause/rule match found (or provisional routine while embedding runs)
-    const provisionalTriage = activeTriage || {
-      acuity: "Level 5 - Non-Urgent / Routine",
-      color: "#38bdf8",
-      action: "Manage at home with rest, lifestyle modifications, and outpatient monitoring.",
-      department: "Primary Care Clinic / Specialized Outpatient Care",
-      medSupport: "General Routine Care: Nutrition, hydration, and standard OTC options.",
-      matchSource: "Evaluating 768-D Bio_ClinicalBERT Embeddings..."
-    };
+    // Instant result on any rule/clause match — zero model hang
+    if (ruleTriage) {
+      renderReport(text, ruleTriage, Math.round(performance.now() - startTime), lastVectorDim, lastSimilarity);
+      isRunning = false;
+      return;
+    }
 
     renderReport(
       text,
-      provisionalTriage,
+      {
+        acuity: "Level 5 - Non-Urgent / Routine",
+        color: "#38bdf8",
+        action: "Manage at home with rest, lifestyle modifications, and outpatient monitoring.",
+        department: "Primary Care Clinic / Specialized Outpatient Care",
+        medSupport: "General Routine Care: Nutrition, hydration, and standard OTC options.",
+        matchSource: "Running 768-D Bio_ClinicalBERT Semantic Match..."
+      },
       Math.round(performance.now() - startTime),
       lastVectorDim,
       lastSimilarity
     );
 
-    // 2. Run 768-D Bio_ClinicalBERT embedding (and use semantic prototype match if no keyword matched)
     try {
       const pipe = await ensureModelLoaded();
       const { userVec, bestScore, triage: semanticTriage } = await classifyWithEmbeddings(pipe, text);
       lastVectorDim = userVec.length;
       lastSimilarity = `Cosine similarity ${bestScore.toFixed(3)} (768-D)`;
-
-      if (!activeTriage) {
-        activeTriage = semanticTriage;
-      }
-
+      renderReport(text, semanticTriage, Math.round(performance.now() - startTime), lastVectorDim, lastSimilarity);
+    } catch (err) {
       renderReport(
         text,
-        activeTriage,
-        Math.round(performance.now() - startTime),
-        lastVectorDim,
-        lastSimilarity
-      );
-    } catch (err) {
-      if (!activeTriage) {
-        activeTriage = {
+        {
           acuity: "Level 5 - Non-Urgent / Routine",
           color: "#38bdf8",
           action: "Manage at home with rest, lifestyle modifications, and outpatient monitoring.",
           department: "Primary Care Clinic / Specialized Outpatient Care",
           medSupport: "General Routine Care: Nutrition, hydration, and standard OTC options.",
-          matchSource: "Default Routine Fallback (Model Load Error)"
-        };
-      }
-      renderReport(
-        text,
-        activeTriage,
+          matchSource: "Routine Fallback (Model Unavailable)"
+        },
         Math.round(performance.now() - startTime),
         lastVectorDim,
         `Fallback (${err.message})`
       );
+    } finally {
+      isRunning = false;
     }
   });
-</script>
-</body>
+</script></body>
 </html>
